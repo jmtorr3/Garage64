@@ -1,0 +1,509 @@
+{
+	"credit": "Made with Blockbench",
+	"textureSize": [256, 256],
+	"texture": "oak2.png",
+	"models": [
+		{
+			"part": "front",
+			"id": "front",
+			"invertAxis": "xy",
+			"mirrorTexture": "u",
+			"translate": [0, -2, -5.5],
+			"rotate": [0, -180, 0],
+			"submodels": [
+				{
+					"id": "Miata2",
+					"invertAxis": "xy",
+					"translate": [7, 2, 8],
+					"submodels": [
+						{
+							"id": "body",
+							"invertAxis": "xy",
+							"translate": [-32, 0, -4],
+							"submodels": [
+								{
+									"id": "bottomhalf",
+									"invertAxis": "xy",
+									"translate": [25, -2, -4],
+									"boxes": [
+										{"coordinates": [-8, 3.3, -9.8, 16, 4, 1], "textureOffset": [0, 0]},
+										{"coordinates": [-10.3, 6.2, 16.2, 1, 1, 2], "textureOffset": [30, 31]},
+										{"coordinates": [-7, 9.3, 22.2, 14, 1, 8], "textureOffset": [33, 96]},
+										{"coordinates": [-4, 4.3, -10.8, 8, 3, 1], "textureOffset": [0, 67]},
+										{"coordinates": [-4, 8.3, -7.8, 8, 1, 3], "textureOffset": [11, 27]},
+										{"coordinates": [-8, 8.3, -4.8, 16, 1, 6], "textureOffset": [102, 19]},
+										{"coordinates": [-7, 2.3, 22.2, 14, 7, 9], "textureOffset": [95, 80]},
+										{"coordinates": [-8, 3.3, 30.2, 6, 5, 2], "textureOffset": [68, 25]},
+										{"coordinates": [-7, 3.3, 31.2, 14, 2, 2], "textureOffset": [0, 13]},
+										{"coordinates": [2, 3.3, 30.2, 6, 5, 2], "textureOffset": [68, 18]},
+										{"coordinates": [-2, 7.3, 31.2, 4, 1, 1], "textureOffset": [11, 24]},
+										{"coordinates": [-10, 3.3, -6.8, 1, 4, 35], "textureOffset": [37, 41]},
+										{"coordinates": [9, 3.3, -6.8, 1, 4, 35], "textureOffset": [0, 37]},
+										{"coordinates": [7, 2.3, 1.2, 2, 6, 29], "textureOffset": [62, 80]},
+										{"coordinates": [9.3, 6.2, 16.2, 1, 1, 2], "textureOffset": [30, 27]},
+										{"coordinates": [-3, 9.3, -4.8, 6, 1, 6], "textureOffset": [0, 17]},
+										{"coordinates": [-9, 2.3, 1.2, 2, 6, 29], "textureOffset": [0, 76]},
+										{"coordinates": [-8, 8.3, 21.2, 1, 1, 9], "textureOffset": [0, 24]},
+										{"coordinates": [7, 8.3, 21.2, 1, 1, 9], "textureOffset": [15, 17]},
+										{"coordinates": [-11, 5.3, -4.8, 1, 1, 32], "textureOffset": [74, 33]},
+										{"coordinates": [-10.7, 6.2, -4.3, 1, 1, 6], "textureOffset": [82, 19]},
+										{"coordinates": [-10.7, 6.2, 20.7, 1, 1, 6], "textureOffset": [80, 44]},
+										{"coordinates": [9.7, 6.2, 20.7, 1, 1, 6], "textureOffset": [57, 65]},
+										{"coordinates": [9.7, 6.2, -4.3, 1, 1, 6], "textureOffset": [37, 65]},
+										{"coordinates": [10, 5.3, -4.8, 1, 1, 32], "textureOffset": [68, 0]},
+										{"coordinates": [-11, 4.3, 2.2, 1, 1, 18], "textureOffset": [58, 115]},
+										{"coordinates": [10, 4.3, 2.2, 1, 1, 18], "textureOffset": [38, 111]},
+										{"coordinates": [-9, 2.3, -8.8, 18, 6, 10], "textureOffset": [33, 80]},
+										{"coordinates": [-8, 1.3, -6.8, 16, 1, 36], "textureOffset": [0, 0]}
+									]
+								},
+								{
+									"id": "exterior",
+									"invertAxis": "xy",
+									"translate": [0, 0, 0],
+									"submodels": [
+										{
+											"id": "rightside2",
+											"invertAxis": "xy",
+											"translate": [2, 0, 0],
+											"submodels": [
+												{
+													"id": "mirror3",
+													"invertAxis": "xy",
+													"translate": [31.5, 0, 0],
+													"rotate": [0, -12.5, 0]
+												}
+											]
+										},
+										{
+											"id": "leftside2",
+											"invertAxis": "xy",
+											"translate": [31, 0, 0],
+											"submodels": [
+												{
+													"id": "mirror4",
+													"invertAxis": "xy",
+													"translate": [31, 0, -7],
+													"rotate": [0, 12.5, 0]
+												}
+											]
+										},
+										{
+											"id": "forward2",
+											"invertAxis": "xy",
+											"translate": [32, 0, 0],
+											"submodels": [
+												{
+													"id": "stockheadlights2",
+													"invertAxis": "xy",
+													"translate": [0, 1.2, 3.8],
+													"rotate": [-10, 0, 0]
+												}
+											]
+										},
+										{
+											"id": "backward2",
+											"invertAxis": "xy",
+											"translate": [32, 0, 0]
+										},
+										{
+											"id": "Roof3",
+											"invertAxis": "xy",
+											"translate": [0, 0, 4],
+											"submodels": [
+												{
+													"id": "stockhardtop2",
+													"invertAxis": "xy",
+													"translate": [0, 3.1, 23.7],
+													"boxes": [
+														{"coordinates": [18.5, 18.25, -22.85, 13, 1, 9], "textureOffset": [74, 66]}
+													],
+													"submodels": [
+														{
+															"id": "stockhardtop3",
+															"invertAxis": "xy",
+															"translate": [25, 18.45, -23.85],
+															"rotate": [-10, 0, 0],
+															"boxes": [
+																{"coordinates": [-6.5, -0.44791, -1.79544, 13, 1, 3], "textureOffset": [0, 9]}
+															]
+														},
+														{
+															"id": "backroof2",
+															"invertAxis": "xy",
+															"translate": [25, 10.60602, -12.40369],
+															"rotate": [-20, 0, 0],
+															"submodels": [
+																{
+																	"id": "bone33",
+																	"invertAxis": "xy",
+																	"translate": [6.75, -0.25, 1],
+																	"rotate": [0, 0, 9],
+																	"boxes": [
+																		{"coordinates": [-1.13985, -8.62022, -0.6793, 2, 17, 1], "textureOffset": [74, 41]}
+																	]
+																},
+																{
+																	"id": "bone34",
+																	"invertAxis": "xy",
+																	"translate": [-6.55, -0.25, 1],
+																	"rotate": [0, 0, -9],
+																	"boxes": [
+																		{"coordinates": [-1.06015, -8.62022, -0.6793, 2, 17, 1], "textureOffset": [74, 0]}
+																	]
+																}
+															]
+														}
+													]
+												},
+												{
+													"id": "windshield2",
+													"invertAxis": "xy",
+													"translate": [25, 13.45855, -4.21859],
+													"rotate": [22.5, 0, 0],
+													"submodels": [
+														{
+															"id": "bone35",
+															"invertAxis": "xy",
+															"translate": [-6.7, 0, 0],
+															"rotate": [0, 0, -9],
+															"boxes": [
+																{"coordinates": [-0.9254, -8.33964, -0.89197, 2, 17, 1], "textureOffset": [68, 0]}
+															]
+														},
+														{
+															"id": "bone36",
+															"invertAxis": "xy",
+															"translate": [6.6, 0, 0],
+															"rotate": [0, 0, 9],
+															"boxes": [
+																{"coordinates": [-0.9746, -8.33964, -0.89197, 2, 17, 1], "textureOffset": [63, 41]}
+															]
+														},
+														{
+															"id": "inside2",
+															"invertAxis": "xy",
+															"translate": [7, -14.05, 8.75],
+															"rotate": [-15, 0, 0],
+															"submodels": [
+																{
+																	"id": "bone37",
+																	"invertAxis": "xy",
+																	"translate": [0.1, 16.33067, -1.26706],
+																	"rotate": [0, 0, 9],
+																	"boxes": [
+																		{"coordinates": [-0.4596, -7.74491, -0.83659, 1, 16, 1], "textureOffset": [0, 83]}
+																	]
+																},
+																{
+																	"id": "bone38",
+																	"invertAxis": "xy",
+																	"translate": [-14.2, 16.33067, -1.26706],
+																	"rotate": [0, 0, -9],
+																	"boxes": [
+																		{"coordinates": [-0.4404, -7.74491, -0.83659, 1, 16, 1], "textureOffset": [32, 5]}
+																	]
+																}
+															]
+														}
+													]
+												}
+											]
+										}
+									]
+								},
+								{
+									"id": "exhaust",
+									"invertAxis": "xy",
+									"translate": [0, 0, 0],
+									"submodels": [
+										{
+											"id": "stock2",
+											"invertAxis": "xy",
+											"translate": [30.8243, -0.2, 26.9352],
+											"rotate": [0, 5, 0],
+											"boxes": [
+												{"coordinates": [-0.5, -0.5, -2.5, 1, 1, 5], "textureOffset": [10, 43]}
+											]
+										}
+									]
+								},
+								{
+									"id": "steeringwheel",
+									"invertAxis": "xy",
+									"translate": [25, -2, -4],
+									"submodels": [
+										{
+											"id": "shaft2",
+											"invertAxis": "xy",
+											"translate": [0, 9.00856, 3.63053],
+											"rotate": [-7.5, 0, 0],
+											"boxes": [
+												{"coordinates": [-1, -0.96084, -2.29743, 2, 2, 2], "textureOffset": [0, 29]}
+											]
+										},
+										{
+											"id": "miatasteeringwheel3",
+											"invertAxis": "xy",
+											"translate": [0, 9.00856, 3.33053],
+											"submodels": [
+												{
+													"id": "miatasteeringwheel4",
+													"invertAxis": "xy",
+													"translate": [0, 0, 0],
+													"rotate": [-7.5, 0, 0],
+													"boxes": [
+														{"coordinates": [-2, -2, -0.5, 4, 4, 1], "textureOffset": [20, 31]}
+													]
+												}
+											]
+										}
+									]
+								},
+								{
+									"id": "StockWheels",
+									"invertAxis": "xy",
+									"translate": [32, 0, 4],
+									"submodels": [
+										{
+											"id": "StockWheelsFrontRight2",
+											"invertAxis": "xy",
+											"translate": [2.5, 0.91318, -9.3076],
+											"boxes": [
+												{"coordinates": [-1, -3, -3, 2, 6, 6], "textureOffset": [0, 141]}
+											]
+										},
+										{
+											"id": "StockWheelsFrontLeft2",
+											"invertAxis": "xy",
+											"translate": [-16.5, 1, -9.3],
+											"boxes": [
+												{"coordinates": [-1, -3, -3, 2, 6, 6], "textureOffset": [0, 120]}
+											]
+										},
+										{
+											"id": "StockWheelsBackRight2",
+											"invertAxis": "xy",
+											"translate": [2.5, 1, 15.7],
+											"boxes": [
+												{"coordinates": [-1, -3, -3, 2, 6, 6], "textureOffset": [0, 55]}
+											]
+										},
+										{
+											"id": "StockWheelsBackLeft2",
+											"invertAxis": "xy",
+											"translate": [-16.5, 1, 15.7],
+											"boxes": [
+												{"coordinates": [-1, -3, -3, 2, 6, 6], "textureOffset": [37, 53]}
+											]
+										}
+									]
+								},
+								{
+									"id": "SideMirrors",
+									"invertAxis": "xy",
+									"translate": [0, 0, 0],
+									"submodels": [
+										{
+											"id": "MirrorR2",
+											"invertAxis": "xy",
+											"translate": [32.4, 0, 1.7],
+											"rotate": [0, -12.5, 0],
+											"boxes": [
+												{"coordinates": [0.93507, 6.3, -2.29289, 3, 2, 2], "textureOffset": [18, 67]}
+											]
+										},
+										{
+											"id": "MirrorL2",
+											"invertAxis": "xy",
+											"translate": [31.6, 0, -0.3],
+											"rotate": [0, 12.5, 0],
+											"boxes": [
+												{"coordinates": [-17.93507, 6.3, -3.29289, 3, 2, 2], "textureOffset": [53, 41]}
+											]
+										}
+									]
+								},
+								{
+									"id": "Seats",
+									"invertAxis": "xy",
+									"translate": [0, 0, 0],
+									"submodels": [
+										{
+											"id": "SeatsFront2",
+											"invertAxis": "xy",
+											"translate": [0, 0, -3],
+											"boxes": [
+												{"coordinates": [19, -0.2, 2.4, 12, 2, 7], "textureOffset": [116, 116]}
+											],
+											"submodels": [
+												{
+													"id": "backrest4",
+													"invertAxis": "xy",
+													"translate": [25, 4.8, 12.2],
+													"rotate": [102.5, 0, 0],
+													"boxes": [
+														{"coordinates": [-6, -2.26919, -3.21863, 12, 2, 7], "textureOffset": [78, 116]}
+													]
+												},
+												{
+													"id": "backrest5",
+													"invertAxis": "xy",
+													"translate": [25, 4.8, 20.2],
+													"rotate": [102.5, 0, 0],
+													"boxes": [
+														{"coordinates": [-6, -1.29289, -3.43507, 12, 2, 7], "textureOffset": [109, 66]}
+													]
+												}
+											]
+										},
+										{
+											"id": "SeatsBack2",
+											"invertAxis": "xy",
+											"translate": [0, 0, 0],
+											"boxes": [
+												{"coordinates": [19, -0.2, 9.4, 12, 2, 8], "textureOffset": [108, 53]}
+											],
+											"submodels": [
+												{
+													"id": "backrest6",
+													"invertAxis": "xy",
+													"translate": [0, 0, 0]
+												}
+											]
+										}
+									]
+								},
+								{
+									"id": "headlights",
+									"invertAxis": "xy",
+									"translate": [25, 0, 1.5],
+									"submodels": [
+										{
+											"id": "headlights2",
+											"invertAxis": "xy",
+											"translate": [7, 0, -0.25],
+											"submodels": [
+												{
+													"id": "StockLights2",
+													"invertAxis": "xy",
+													"translate": [-7, 8.6, -10.05],
+													"rotate": [-12.5, 0, 0],
+													"boxes": [
+														{"coordinates": [-8, -4.43507, -3.79289, 4, 3, 4], "textureOffset": [80, 37]},
+														{"coordinates": [4, -4.43507, -3.79289, 4, 3, 4], "textureOffset": [80, 7]}
+													]
+												},
+												{
+													"id": "SleepyLights2",
+													"invertAxis": "xy",
+													"translate": [0, -3.05, 0.55],
+													"rotate": [10, 0, 0],
+													"boxes": [
+														{"coordinates": [-15, 5.39791, -15.39544, 4, 3, 4], "textureOffset": [80, 0]},
+														{"coordinates": [-3, 5.39791, -15.39544, 4, 3, 4], "textureOffset": [12, 79]}
+													]
+												},
+												{
+													"id": "lightsUP2",
+													"invertAxis": "xy",
+													"translate": [0, -5.6, -3.3],
+													"rotate": [15, 0, 0],
+													"boxes": [
+														{"coordinates": [-3, 8.72235, -13.03978, 4, 3, 4], "textureOffset": [76, 55]},
+														{"coordinates": [-15, 8.72235, -13.03978, 4, 3, 4], "textureOffset": [0, 76]}
+													]
+												}
+											]
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			],
+			"animations": [
+				{
+					"180SXSteeringWheel1.rz": "(paddle_left.rx + 180)* 2",
+					"180SXSteeringWheel2.rz": "(paddle_right.rx + 180) * -2",
+					"180SXBNKitWheelsFrontRight.rx": "(paddle_left.rx + 360) * 60",
+					"180SXBNKitWheelsFrontLeft.rx": "(paddle_right.rx + 360) * 60",
+					"180SXBNKitWheelsBackRight.rx": "(paddle_left.rx + 360) * 60",
+					"180SXBNKitWheelsBackLeft.rx": "(paddle_right.rx + 360) * 60",
+					"180SXStockWheelsFrontRight.rx": "(paddle_left.rx + 360) * 60",
+					"180SXStockWheelsFrontLeft.rx": "(paddle_right.rx + 360) * 60",
+					"180SXStockWheelsBackRight.rx": "(paddle_left.rx + 360) * 60",
+					"180SXStockWheelsBackLeft.rx": "(paddle_right.rx + 360) * 60",
+					"ChaserBNKitWheelsFrontRight.rx": "(paddle_left.rx + 360) * 60",
+					"ChaserBNKitWheelsFrontLeft.rx": "(paddle_right.rx + 360) * 60",
+					"ChaserBNKitWheelsBackRight.rx": "(paddle_left.rx + 360) * 60",
+					"ChaserBNKitWheelsBackLeft.rx": "(paddle_right.rx + 360) * 60",
+					"ChaserStockWheelsFrontRight.rx": "(paddle_left.rx + 360) * 60",
+					"ChaserStockWheelsFrontLeft.rx": "(paddle_right.rx + 360) * 60",
+					"ChaserStockWheelsBackRight.rx": "(paddle_left.rx + 360) * 60",
+					"ChaserStockWheelsBackLeft.rx": "(paddle_right.rx + 360) * 60",
+					"ChaserSteeringWheel1.rz": "(paddle_left.rx + 180)* 2",
+					"ChaserSteeringWheel2.rz": "(paddle_right.rx + 180) * -2",
+					"StockWheelsFrontRight.rx": "(paddle_left.rx + 360) * 60",
+					"StockWheelsFrontLeft.rx": "(paddle_right.rx + 360) * 60",
+					"StockWheelsBackRight.rx": "(paddle_left.rx + 360) * 60",
+					"StockWheelsBackLeft.rx": "(paddle_right.rx + 360) * 60",
+					"miatasteeringwheel1.rz": "(paddle_left.rx + 180)* 2",
+					"miatasteeringwheel2.rz": "(paddle_right.rx + 180) * -2",
+					"MiataDuceKitWheelsFrontRight2.rx": "(paddle_left.rx + 360) * 60",
+					"MiataDuceKitWheelsFrontLeft2.rx": "(paddle_right.rx + 360) * 60",
+					"MiataDuceKitWheelsBackRight2.rx": "(paddle_left.rx + 360) * 60",
+					"MiataDuceKitWheelsBackLeft2.rx": "(paddle_right.rx + 360) * 60",
+					"MiataKaidoKitWheelsFrontRight.rx": "(paddle_left.rx + 360) * 60",
+					"MiataKaidoKitWheelsFrontLeft.rx": "(paddle_right.rx + 360) * 60",
+					"MiataKaidoKitWheelsBackRight.rx": "(paddle_left.rx + 360) * 60",
+					"MiataKaidoKitWheelsBackLeft.rx": "(paddle_right.rx + 360) * 60"
+				}
+			]
+		},
+		{
+			"part": "bottom",
+			"id": "bottom",
+			"invertAxis": "xy",
+			"mirrorTexture": "u",
+			"translate": [0, -18, 0]
+		},
+		{
+			"part": "back",
+			"id": "back",
+			"invertAxis": "xy",
+			"mirrorTexture": "u",
+			"translate": [-11, -24, 0]
+		},
+		{
+			"part": "right",
+			"id": "right",
+			"invertAxis": "xy",
+			"mirrorTexture": "u",
+			"translate": [0, -24, 3],
+			"rotate": [0, 180, 0]
+		},
+		{
+			"part": "left",
+			"id": "left",
+			"invertAxis": "xy",
+			"mirrorTexture": "u",
+			"translate": [0, -24, -9]
+		},
+		{
+			"part": "paddle_left",
+			"id": "paddle_left",
+			"invertAxis": "xy",
+			"mirrorTexture": "u",
+			"translate": [-13.5, -6, 4]
+		},
+		{
+			"part": "paddle_right",
+			"id": "paddle_right",
+			"invertAxis": "xy",
+			"mirrorTexture": "u",
+			"translate": [13.5, -6, 4]
+		}
+	]
+}
