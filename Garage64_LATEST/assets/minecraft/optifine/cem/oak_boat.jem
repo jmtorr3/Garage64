@@ -801,18 +801,6 @@
 				}
 			]
 		},
-			{
-      "id": "DuceKitWheels",
-      "part": "front",
-      "attach": true,
-      "invertAxis": "xy",
-      "mirrorTexture": "u",
-      "translate": [0, -2, -5.5],
-      "rotate": [0, -180, 0],
-      "texture": "minecraft:textures/entity/boat/miata_duce_wheels.png",
-      "textureSize": [32, 32],
-      "model": "minecraft:optifine/cem/parts/miata/miata_duce_wheels.jpm"
-    },
 		{
 			"part": "bottom",
 			"id": "bottom",
