@@ -581,77 +581,6 @@
 									]
 								},
 								{
-									"id": "StockWheels",
-									"invertAxis": "xy",
-									"translate": [32, 0, 4],
-									"submodels": [
-										{
-											"id": "StockWheelsFrontRight2",
-											"invertAxis": "xy",
-											"translate": [2.5, 0.91318, -9.3076],
-											"boxes": [
-												{
-													"coordinates": [-1, -3, -3, 2, 6, 6],
-													"uvNorth": [82, 83, 84, 89],
-													"uvEast": [0, 71, 6, 77],
-													"uvSouth": [16, 84, 18, 90],
-													"uvWest": [6, 71, 12, 77],
-													"uvUp": [20, 90, 18, 84],
-													"uvDown": [22, 84, 20, 90]
-												}
-											]
-										},
-										{
-											"id": "StockWheelsFrontLeft2",
-											"invertAxis": "xy",
-											"translate": [-16.5, 1, -9.3],
-											"boxes": [
-												{
-													"coordinates": [-1, -3, -3, 2, 6, 6],
-													"uvNorth": [22, 84, 24, 90],
-													"uvEast": [42, 71, 48, 77],
-													"uvSouth": [67, 84, 69, 90],
-													"uvWest": [48, 71, 54, 77],
-													"uvUp": [71, 90, 69, 84],
-													"uvDown": [73, 84, 71, 90]
-												}
-											]
-										},
-										{
-											"id": "StockWheelsBackRight2",
-											"invertAxis": "xy",
-											"translate": [2.5, 1, 15.7],
-											"boxes": [
-												{
-													"coordinates": [-1, -3, -3, 2, 6, 6],
-													"uvNorth": [84, 83, 86, 89],
-													"uvEast": [12, 72, 18, 78],
-													"uvSouth": [0, 85, 2, 91],
-													"uvWest": [18, 72, 24, 78],
-													"uvUp": [4, 91, 2, 85],
-													"uvDown": [6, 85, 4, 91]
-												}
-											]
-										},
-										{
-											"id": "StockWheelsBackLeft2",
-											"invertAxis": "xy",
-											"translate": [-16.5, 1, 15.7],
-											"boxes": [
-												{
-													"coordinates": [-1, -3, -3, 2, 6, 6],
-													"uvNorth": [6, 85, 8, 91],
-													"uvEast": [67, 72, 73, 78],
-													"uvSouth": [85, 67, 87, 73],
-													"uvWest": [73, 30, 79, 36],
-													"uvUp": [88, 89, 86, 83],
-													"uvDown": [89, 67, 87, 73]
-												}
-											]
-										}
-									]
-								},
-								{
 									"id": "SideMirrors",
 									"invertAxis": "xy",
 									"translate": [0, 0, 0],
@@ -870,18 +799,9 @@
 						}
 					]
 				}
-			],
-			"animations": [
-				{
-					"StockWheelsFrontRight2.rx": "(paddle_left.rx + 360) * 60",
-					"StockWheelsFrontLeft2.rx": "(paddle_right.rx + 360) * 60",
-					"StockWheelsBackRight2.rx": "(paddle_left.rx + 360) * 60",
-					"StockWheelsBackLeft2.rx": "(paddle_right.rx + 360) * 60"
-				}
 			]
 		},
-
-    {
+	{
       "id": "DuceKitWheels",
       "part": "front",
       "attach": true,
@@ -893,8 +813,6 @@
       "textureSize": [32, 32],
       "model": "minecraft:optifine/cem/parts/miata/miata_duce_wheels.jpm"
     },
-
-
 		{
 			"part": "bottom",
 			"id": "bottom",
