@@ -813,6 +813,18 @@
       "textureSize": [32, 32],
       "model": "minecraft:optifine/cem/miata/parts/miata_duce_wheels.jpm"
     },
+	{
+  "id": "MiataPopups",
+  "part": "front",
+  "attach": true,
+  "invertAxis": "xy",
+  "mirrorTexture": "u",
+  "translate": [0, -2, -5.5],
+  "rotate": [0, -180, 0],
+  "texture": "minecraft:optifine/cem/miata/parts/miata_popups.png",
+  "textureSize": [16, 16],
+  "model": "minecraft:optifine/cem/miata/parts/miata_popups.jpm"
+},
 		{
 			"part": "bottom",
 			"id": "bottom",
