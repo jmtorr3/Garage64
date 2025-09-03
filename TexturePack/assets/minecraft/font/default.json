@@ -1,6 +1,0 @@
-{
-    "providers": [
-        {"type": "bitmap", "file": "minecraft:guis/pixel.png","ascent": -2000,"height": -3,"chars": ["七"]},
-        {"type": "bitmap", "file": "minecraft:guis/guitest/guitest.png","ascent": 13,"height": 221,"chars": ["ㇺ"]}
-    ]
-}
