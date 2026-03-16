@@ -162,6 +162,15 @@ function parseBox(box, mat, tw, th, inv, mirrorU) {
     return mesh
   }
 
+  // When an axis is inverted the box centre moves to the opposite side, so the
+  // face that was pointing outward now points inward — swap the UV pair.
+  if (inv.includes('x')) {
+    ;[uvFaces.east, uvFaces.west] = [uvFaces.west, uvFaces.east]
+  }
+  if (inv.includes('z')) {
+    ;[uvFaces.north, uvFaces.south] = [uvFaces.south, uvFaces.north]
+  }
+
   if (mirrorU) {
     for (const k of Object.keys(uvFaces)) {
       const [u0, v0, u1, v1] = uvFaces[k]
@@ -208,13 +217,24 @@ function mcCubeUVs(u, v, w, h, d, tw, th) {
 function buildBoxGeo(w, h, d, uvFaces) {
   const hw = w / 2, hh = h / 2, hd = d / 2
 
+  // root.scale.y = -1 flips the scene's Y axis, which has two consequences:
+  //
+  //  1. Side faces (N/S/E/W): local -hh (bottom) ends up visually at the top,
+  //     so V must be flipped so the UV top still maps to the visual top.
+  //
+  //  2. Horizontal faces: local +hh ends up at the visual BOTTOM and -hh at
+  //     the visual TOP — the opposite of the CEM convention. To fix this:
+  //     - assign 'down' to the +hh geometry (visual bottom → correct)
+  //     - assign 'up'   to the -hh geometry (visual top  → correct)
+  //     The -hh geometry also has its Z vertex order reversed relative to the
+  //     expected north=v1/south=v0 convention, so it needs flipV: true as well.
   const FACES = [
-    { name: 'south', verts: [[-hw,-hh, hd],[ hw,-hh, hd],[ hw, hh, hd],[-hw, hh, hd]] },
-    { name: 'north', verts: [[ hw,-hh,-hd],[-hw,-hh,-hd],[-hw, hh,-hd],[ hw, hh,-hd]] },
-    { name: 'east',  verts: [[ hw,-hh, hd],[ hw,-hh,-hd],[ hw, hh,-hd],[ hw, hh, hd]] },
-    { name: 'west',  verts: [[-hw,-hh,-hd],[-hw,-hh, hd],[-hw, hh, hd],[-hw, hh,-hd]] },
-    { name: 'up',    verts: [[-hw, hh, hd],[ hw, hh, hd],[ hw, hh,-hd],[-hw, hh,-hd]] },
-    { name: 'down',  verts: [[-hw,-hh,-hd],[ hw,-hh,-hd],[ hw,-hh, hd],[-hw,-hh, hd]] },
+    { name: 'south', flipV: true,  verts: [[-hw,-hh, hd],[ hw,-hh, hd],[ hw, hh, hd],[-hw, hh, hd]] },
+    { name: 'north', flipV: true,  verts: [[ hw,-hh,-hd],[-hw,-hh,-hd],[-hw, hh,-hd],[ hw, hh,-hd]] },
+    { name: 'east',  flipV: true,  verts: [[ hw,-hh, hd],[ hw,-hh,-hd],[ hw, hh,-hd],[ hw, hh, hd]] },
+    { name: 'west',  flipV: true,  verts: [[-hw,-hh,-hd],[-hw,-hh, hd],[-hw, hh, hd],[-hw, hh,-hd]] },
+    { name: 'down',  flipV: false, verts: [[-hw, hh, hd],[ hw, hh, hd],[ hw, hh,-hd],[-hw, hh,-hd]] },
+    { name: 'up',    flipV: true,  verts: [[-hw,-hh,-hd],[ hw,-hh,-hd],[ hw,-hh, hd],[-hw,-hh, hd]] },
   ]
 
   const positions = [], uvs = [], indices = []
@@ -225,7 +245,8 @@ function buildBoxGeo(w, h, d, uvFaces) {
     if (!uv) continue
     const [u0, v0, u1, v1] = uv
     for (const [px, py, pz] of face.verts) positions.push(px, py, pz)
-    uvs.push(u0, v0, u1, v0, u1, v1, u0, v1)
+    const [va, vb] = face.flipV ? [v1, v0] : [v0, v1]
+    uvs.push(u0, va, u1, va, u1, vb, u0, vb)
     indices.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3)
     vi += 4
   }
