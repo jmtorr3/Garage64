@@ -31,8 +31,10 @@ const s = {
   sidebar:       { flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)', overflow: 'hidden' },
   centerPanel:   { flex: 1, position: 'relative', overflow: 'hidden' },
   divider:       { width: '4px', flexShrink: 0, cursor: 'col-resize', background: 'var(--bdr-dk)', userSelect: 'none' },
-  rightPanel:    { flexShrink: 0, overflow: 'auto', padding: '12px', background: 'var(--bg-window)' },
-  rightPanelTex: { flexShrink: 0, overflow: 'auto', padding: '1rem', background: '#1a1a1a' },
+  rightPanelEdit: { flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  rightPanelUV:  { flex: 1, overflow: 'auto', padding: '12px', background: 'var(--bg-window)', minHeight: 0 },
+  rightPanelTex: { flex: 1, overflow: 'auto', padding: '1rem', background: '#1a1a1a', minHeight: 0 },
+  rightPanelDivH:{ height: '4px', flexShrink: 0, background: 'var(--bdr-dk)' },
   tabBar:      { display: 'flex', gap: '2px', background: 'var(--bg-panel)', borderBottom: '2px solid var(--bdr-dk)', padding: '4px 4px 0', flexShrink: 0 },
   tab:         { flex: 1, padding: '3px 0', textAlign: 'center', borderRadius: '3px 3px 0 0', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: '1px solid var(--bdr-dk)', borderBottom: 'none', fontFamily: 'Tahoma,sans-serif', background: 'var(--bg-panel-alt)', color: 'var(--clr-text-dim)' },
   tabContent:  { flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', background: 'var(--bg-panel)', padding: '4px', borderTop: 'none', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)' },
@@ -619,8 +621,8 @@ export default function Studio() {
 
           {/* Tab bar */}
           <div style={s.tabBar}>
-            {[['compose','Compose'],['uv','UV'],['texture','Texture']].map(([id,label]) => {
-              const dirty = (id==='uv'&&uvDirty)||(id==='texture'&&texDirty)
+            {[['compose','Compose'],['edit','Edit']].map(([id,label]) => {
+              const dirty = (id==='edit'&&(uvDirty||texDirty))
               return (
                 <button key={id} style={{ ...s.tab, background: tab===id ? 'var(--bg-window)':'var(--bg-panel-alt)', color: tab===id ? 'var(--clr-text)':'var(--clr-text-dim)', fontWeight: tab===id ? 'bold':'normal' }}
                   onClick={() => setTab(id)}>{label}{dirty ? ' *' : ''}</button>
@@ -656,8 +658,8 @@ export default function Studio() {
                       <span style={s.partLabel}>{selPart?.name ?? '(none)'}</span>
                       {selPart && (
                         <div style={s.editBtns}>
-                          <button style={s.editBtn} title="Edit UV" onClick={() => { setTab('uv'); setUvSrc('part'); setUvPartId(selPart.id) }}>UV</button>
-                          <button style={s.editBtn} title="Edit texture" onClick={() => { setTab('texture'); setTexPartId(String(selPart.id)) }}>Tex</button>
+                          <button style={s.editBtn} title="Edit UV" onClick={() => { setTab('edit'); setUvSrc('part'); setUvPartId(selPart.id) }}>UV</button>
+                          <button style={s.editBtn} title="Edit texture" onClick={() => { setTab('edit'); setTexPartId(String(selPart.id)) }}>Tex</button>
                         </div>
                       )}
                       <button style={s.slotNavBtn} onClick={() => stepSlotPart(slot.name, 1)}>▶</button>
@@ -682,8 +684,8 @@ export default function Studio() {
                           <span style={extraSel.has(p.id) ? s.radioActive : s.radioInact}>{p.name}</span>
                         </div>
                         <div style={s.editBtns} onClick={e => e.stopPropagation()}>
-                          <button style={s.editBtn} title="Edit UV" onClick={() => { setTab('uv'); setUvSrc('part'); setUvPartId(p.id) }}>UV</button>
-                          <button style={s.editBtn} title="Edit texture" onClick={() => { setTab('texture'); setTexPartId(String(p.id)) }}>Tex</button>
+                          <button style={s.editBtn} title="Edit UV" onClick={() => { setTab('edit'); setUvSrc('part'); setUvPartId(p.id) }}>UV</button>
+                          <button style={s.editBtn} title="Edit texture" onClick={() => { setTab('edit'); setTexPartId(String(p.id)) }}>Tex</button>
                         </div>
                       </div>
                     ))}
@@ -720,8 +722,9 @@ export default function Studio() {
               </div>
             </>}
 
-            {/* ══ UV ══ */}
-            {tab === 'uv' && <>
+            {/* ══ EDIT (UV + Texture) ══ */}
+            {tab === 'edit' && <>
+              <div style={{ ...s.secHead, marginBottom:'2px', fontSize:'10px', letterSpacing:'0.08em' }}>UV EDITOR</div>
               {/* Source toggle */}
               <div style={{ ...s.tabBar, margin: 0 }}>
                 {[['part','Part (JPM)'],['body','Body (JEM)']].map(([src,label]) => (
@@ -802,15 +805,14 @@ export default function Studio() {
               )}
 
               <div style={{ display:'flex', gap:'6px', alignItems:'center' }}>
-                <button style={s.btn} onClick={uvSave}>Save</button>
+                <button style={s.btn} onClick={uvSave}>Save UV</button>
                 <button style={s.btnSm} onClick={uvRevert}>Revert</button>
                 {uvStatus==='ok' && <span style={s.ok}>Saved!</span>}
                 {uvStatus && uvStatus!=='ok' && <span style={s.err}>{uvStatus}</span>}
               </div>
-            </>}
 
-            {/* ══ TEXTURE ══ */}
-            {tab === 'texture' && <>
+              <div style={{ height:'1px', background:'var(--bdr-dk)', margin:'6px 0', flexShrink:0 }} />
+              <div style={{ ...s.secHead, marginBottom:'2px', fontSize:'10px', letterSpacing:'0.08em' }}>TEXTURE PAINTER</div>
               <div style={s.section}>
                 <div style={s.secHead}>Source</div>
                 <div style={s.secBody}>
@@ -900,7 +902,7 @@ export default function Studio() {
                 {texStatus==='ok' && <span style={s.ok}>Saved!</span>}
                 {texStatus && texStatus!=='ok' && <span style={s.err}>{texStatus}</span>}
               </div>
-            </>}
+            </>} {/* edit */}
 
           </div>{/* tabContent */}
 
@@ -934,28 +936,26 @@ export default function Studio() {
             : <div style={{ color:'var(--clr-text-dim)', padding:'2rem', fontSize:'0.9rem' }}>Select a body to preview.</div>}
         </div>
 
-        {/* ── Right divider + panel (UV / Texture only) ── */}
-        {tab !== 'compose' && <>
+        {/* ── Right divider + panel (Edit tab only) ── */}
+        {tab === 'edit' && <>
           <div style={s.divider} onMouseDown={e => { e.preventDefault(); dragRef2.current = { side:'right', startX: e.clientX, startW: rightWidth } }} />
 
-          {tab === 'uv' && (
-            <div style={{ ...s.rightPanel, width: rightWidth }}>
+          <div style={{ ...s.rightPanelEdit, width: rightWidth }}>
+            <div style={s.rightPanelUV}>
               {uvBox
                 ? <UVCanvas img={uvImg} textureSize={uvTexSize} box={uvBox}
                     selectedFace={selFace} onFaceSelect={setSelFace} onBoxChange={uvHandleBoxChange} />
                 : <div style={{ color:'var(--clr-text-dim)', fontSize:'0.9rem' }}>Select a box to edit UVs.</div>}
             </div>
-          )}
-
-          {tab === 'texture' && (
-            <div style={{ ...s.rightPanelTex, width: rightWidth }}>
+            <div style={s.rightPanelDivH} />
+            <div style={s.rightPanelTex}>
               {texPath
                 ? <canvas ref={canvasRef} style={s.canvasWrap}
                     onMouseDown={onTexDown} onMouseMove={onTexMove}
                     onMouseUp={onTexUp} onMouseLeave={onTexLeave} />
                 : <div style={{ color:'var(--clr-text-dim)', fontSize:'0.9rem' }}>Select a part to load its texture.</div>}
             </div>
-          )}
+          </div>
         </>}
 
       </div>{/* content */}

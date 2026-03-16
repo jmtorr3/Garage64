@@ -103,14 +103,14 @@ After the position negation, that `+hw` face now points **inward** (toward the m
 
 Without correction, the visible outer face of the box (at `−hw`) shows `'west'` UV, which is typically a different (wrong) colour.
 
-**Fix:** swap `uvFaces.east ↔ uvFaces.west` when **both** `inv.includes('x')` AND `mirrorU` are true.
-Similarly swap `uvFaces.north ↔ uvFaces.south` when `inv.includes('z')` AND `mirrorU`.
+**Fix:** swap `uvFaces.east ↔ uvFaces.west` when `mirrorU` AND `inv.includes('x')` AND the box uses **explicit per-face UVs** (not `textureOffset`).
+Similarly swap `uvFaces.north ↔ uvFaces.south` when `mirrorU` AND `inv.includes('z')` AND explicit UVs.
 
 ```js
-if (mirrorU && inv.includes('x')) {
+if (mirrorU && !box.textureOffset && inv.includes('x')) {
   ;[uvFaces.east, uvFaces.west] = [uvFaces.west, uvFaces.east]
 }
-if (mirrorU && inv.includes('z')) {
+if (mirrorU && !box.textureOffset && inv.includes('z')) {
   ;[uvFaces.north, uvFaces.south] = [uvFaces.south, uvFaces.north]
 }
 ```
@@ -118,8 +118,16 @@ if (mirrorU && inv.includes('z')) {
 **Why the `mirrorU` guard?**
 Blockbench pre-swaps the east/west UV atlas assignments *only* when `mirrorTexture: "u"` and `invertAxis: "x"` are combined — because the visual mirror in 3D corresponds to a left–right texture flip that Blockbench compensates for at export time. Without `mirrorTexture`, Blockbench assigns face UVs straight (no pre-swap), so no correction is needed here.
 
-- Parts with `mirrorTexture: "u"` + `invertAxis: "x"` (e.g. car body panels) → swap applied → correct exterior colour ✓
-- Parts with `invertAxis: "x"` but **no** `mirrorTexture` (e.g. wheel discs) → no swap → uvEast stays on the east face ✓
+**Why the `!box.textureOffset` guard?**
+There are two ways a box can specify its face UVs:
+
+- **Explicit UVs** (`uvNorth`, `uvEast`, … properties): the artist painted UVs for one side of the model and Blockbench did **not** pre-correct for mirroring — the swap is required to put the right UV on the right face after X-inversion.
+- **`textureOffset` (standard Minecraft cross layout)**: `mcCubeUVs` derives all six face regions from a single offset using the standard formula. That formula already reads the correct atlas region for each face regardless of mirroring — applying the east/west swap on top of it produces the **wrong** face.
+
+Concrete examples:
+- Car body door panels — explicit `uvNorth/East/…` + `mirrorTexture: "u"` + `invertAxis: "xy"` → swap applied → correct exterior colour ✓
+- Wheel attachment — `textureOffset` + `mirrorTexture: "u"` + `invertAxis: "xy"` → swap skipped → formula already correct, no inside-out texture ✓
+- Parts with `invertAxis: "x"` but **no** `mirrorTexture` → `mirrorU` is false → swap skipped entirely ✓
 
 This runs **before** `mirrorU` so that U-flipping is applied to the already-swapped faces.
 
@@ -173,6 +181,6 @@ All the same corrections (invertAxis swap, mirrorU, flipV) apply after this layo
 ## Summary — order of UV operations in `parseBox`
 
 1. Build `uvFaces` from `textureOffset` (mcCubeUVs) or explicit `uvNorth/…` properties → normalise pixels to Three.js UV via `normUV`
-2. **`invertAxis` swap:** if `inv` includes `'x'`, swap east↔west; if `'z'`, swap north↔south
+2. **`invertAxis` swap:** if `mirrorU` AND explicit UVs (`!textureOffset`) AND `inv` includes `'x'`, swap east↔west; if `'z'`, swap north↔south. Skip for `textureOffset` boxes — the formula already produces correct regions without a swap.
 3. **`mirrorU` flip:** if `mirrorTexture: "u"` is active, flip `u0↔u1` for every face
 4. Pass `uvFaces` to `buildBoxGeo` which assigns UVs to quad vertices with per-face `flipV`
