@@ -168,10 +168,13 @@ function parseBox(box, mat, tw, th, inv, mirrorU) {
   // Blockbench pre-swaps east/west UV assignments when mirrorTexture:"u" +
   // invertAxis:"x" are combined, so we must swap to match.
   // Without mirrorTexture the UV assignments are straight (no swap needed).
-  if (mirrorU && inv.includes('x')) {
+  // Explicit-UV boxes: swap facing pairs so the artist-assigned UVs land on the
+  // correct mirrored face.  textureOffset boxes use a formula that already reads
+  // the correct region without a swap — swapping them produces the wrong result.
+  if (mirrorU && !box.textureOffset && inv.includes('x')) {
     ;[uvFaces.east, uvFaces.west] = [uvFaces.west, uvFaces.east]
   }
-  if (mirrorU && inv.includes('z')) {
+  if (mirrorU && !box.textureOffset && inv.includes('z')) {
     ;[uvFaces.north, uvFaces.south] = [uvFaces.south, uvFaces.north]
   }
 
