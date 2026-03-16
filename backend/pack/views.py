@@ -47,6 +47,8 @@ class CarVariantViewSet(viewsets.ModelViewSet):
         """Return the fully compiled JEM JSON for this variant (body + injected parts)."""
         variant = self.get_object()
         jem = json.loads(json.dumps(variant.body.body_data))
+        if variant.texture_override:
+            jem['texture'] = variant.texture_override
 
         attachments = []
         for vp in VariantPart.objects.filter(variant=variant).order_by('order'):
@@ -112,6 +114,8 @@ class CarVariantViewSet(viewsets.ModelViewSet):
 def _write_jem(cem_dir: Path, variant: CarVariant):
     """Build and write a .jem file for a CarVariant."""
     jem = json.loads(json.dumps(variant.body.body_data))  # deep copy
+    if variant.texture_override:
+        jem['texture'] = variant.texture_override
 
     # Collect attachment entries for each part in order
     attachments = []
@@ -172,8 +176,7 @@ def pack_asset(request):
     full_path = Path(settings.PACK_ROOT) / 'assets' / 'minecraft' / rel
 
     if request.method == 'PUT':
-        if not full_path.exists():
-            raise Http404
+        full_path.parent.mkdir(parents=True, exist_ok=True)
         full_path.write_bytes(request.body)
         return Response({'status': 'ok'})
 

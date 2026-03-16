@@ -2,15 +2,15 @@ import { useState } from 'react'
 import { api } from '../api'
 
 const s = {
-  heading: { fontSize: '1.2rem', marginBottom: '0.5rem', color: '#f90' },
-  sub: { color: '#888', fontSize: '0.9rem', marginBottom: '2rem' },
-  box: { background: '#1a1a1a', border: '1px solid #333', borderRadius: '6px', padding: '1.5rem', maxWidth: '520px' },
-  btn: { fontSize: '1rem', padding: '10px 24px', cursor: 'pointer', background: '#f90', color: '#000', border: 'none', borderRadius: '4px', fontWeight: 'bold', fontFamily: 'monospace' },
-  btnDisabled: { background: '#555', color: '#999', cursor: 'not-allowed' },
-  status: { marginTop: '1rem', padding: '0.75rem', borderRadius: '4px', fontSize: '0.9rem', fontFamily: 'monospace' },
-  ok: { background: '#1a3a1a', color: '#6f6', border: '1px solid #3a6a3a' },
-  err: { background: '#3a1a1a', color: '#f66', border: '1px solid #6a3a3a' },
-  errList: { marginTop: '0.5rem', paddingLeft: '1rem', fontSize: '0.8rem' },
+  heading:    { fontSize: '13px', marginBottom: '4px', color: 'var(--clr-accent)', fontWeight: 'bold', fontFamily: 'Tahoma,sans-serif' },
+  sub:        { color: 'var(--clr-text-dim)', fontSize: '11px', marginBottom: '1.5rem', fontFamily: 'Tahoma,sans-serif' },
+  box:        { background: 'var(--bg-panel)', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)', padding: '16px', maxWidth: '520px' },
+  btn:        { fontSize: '12px', padding: '6px 20px', cursor: 'pointer', background: 'var(--bg-btn-primary)', borderTop: '2px solid var(--bdr-btn-primary-lt)', borderLeft: '2px solid var(--bdr-btn-primary-lt)', borderRight: '2px solid var(--bdr-btn-primary-dk)', borderBottom: '2px solid var(--bdr-btn-primary-dk)', color: '#fff', fontWeight: 'bold', fontFamily: 'Tahoma,sans-serif' },
+  btnDisabled:{ background: 'var(--bg-panel-alt)', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)', color: 'var(--clr-text-dim)', cursor: 'not-allowed' },
+  status:     { marginTop: '10px', padding: '8px 10px', fontSize: '11px', fontFamily: 'Tahoma,sans-serif', borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-lt)', borderBottom: '2px solid var(--bdr-lt)' },
+  ok:         { background: 'var(--clr-badge-bg)', color: 'var(--clr-ok)', border: 'none' },
+  err:        { background: 'var(--bg-section)', color: 'var(--clr-err)', border: 'none' },
+  errList:    { marginTop: '4px', paddingLeft: '1rem', fontSize: '11px' },
 }
 
 export default function Export() {
@@ -43,7 +43,7 @@ export default function Export() {
       </p>
 
       <div style={s.box}>
-        <p style={{ marginBottom: '1rem', fontSize: '0.85rem', color: '#aaa' }}>
+        <p style={{ marginBottom: '1rem', fontSize: '0.85rem', color: 'var(--clr-text-dim)' }}>
           This overwrites the current pack files. Make sure your variants and
           parts are correct before exporting.
         </p>

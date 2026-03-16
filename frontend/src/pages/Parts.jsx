@@ -1,22 +1,26 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 
+const XP_BTN    = { padding: '4px 14px', background: 'var(--bg-btn)', borderTop: '2px solid var(--bdr-btn-lt)', borderLeft: '2px solid var(--bdr-btn-lt)', borderRight: '2px solid var(--bdr-btn-dk)', borderBottom: '2px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', fontFamily: 'Tahoma,sans-serif', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }
+const XP_INPUT  = { width: '100%', padding: '3px 6px', background: 'var(--bg-input)', color: 'var(--clr-text)', borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)', fontFamily: 'Tahoma,sans-serif', fontSize: '11px', boxSizing: 'border-box' }
+const XP_TITLE  = { background: 'var(--bg-title)', color: 'var(--clr-text-on-title)', padding: '3px 8px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'Tahoma,sans-serif', letterSpacing: '0.04em' }
+
 const s = {
-  heading: { fontSize: '1.2rem', marginBottom: '1.5rem', color: '#f90' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' },
-  card: { background: '#1e1e1e', border: '1px solid #333', borderRadius: '6px', padding: '1rem' },
-  cardTitle: { fontWeight: 'bold', marginBottom: '4px', color: '#fff' },
-  path: { fontSize: '0.75rem', color: '#666', marginBottom: '0.75rem', wordBreak: 'break-all' },
-  btn: { fontSize: '0.8rem', padding: '4px 10px', cursor: 'pointer', background: '#333', color: '#fff', border: '1px solid #555', borderRadius: '4px', marginRight: '6px' },
-  btnDanger: { background: '#500', borderColor: '#900' },
-  form: { background: '#1a1a1a', border: '1px solid #444', borderRadius: '6px', padding: '1.25rem', marginBottom: '2rem' },
-  formTitle: { fontWeight: 'bold', marginBottom: '1rem', color: '#f90' },
-  row: { marginBottom: '0.75rem' },
-  label: { display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '3px' },
-  input: { width: '100%', padding: '6px 8px', background: '#111', color: '#eee', border: '1px solid #444', borderRadius: '4px', fontFamily: 'monospace' },
-  textarea: { width: '100%', padding: '6px 8px', background: '#111', color: '#eee', border: '1px solid #444', borderRadius: '4px', fontFamily: 'monospace', minHeight: '120px', resize: 'vertical' },
-  error: { color: '#f66', fontSize: '0.85rem', margin: '0.5rem 0' },
-  jsonErr: { color: '#f66', fontSize: '0.75rem' },
+  heading:   { fontSize: '13px', marginBottom: '1.25rem', color: 'var(--clr-accent)', fontWeight: 'bold', fontFamily: 'Tahoma,sans-serif' },
+  grid:      { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '8px' },
+  card:      { background: 'var(--bg-window)', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)', padding: '10px' },
+  cardTitle: { fontWeight: 'bold', marginBottom: '3px', color: 'var(--clr-text)', fontFamily: 'Tahoma,sans-serif', fontSize: '12px' },
+  path:      { fontSize: '10px', color: 'var(--clr-text-dim)', marginBottom: '8px', wordBreak: 'break-all', fontFamily: 'monospace' },
+  btn:       { ...XP_BTN, marginRight: '6px' },
+  btnDanger: { ...XP_BTN, background: 'var(--bg-btn-danger)', borderTop: '2px solid var(--bdr-btn-danger-lt)', borderLeft: '2px solid var(--bdr-btn-danger-lt)', borderRight: '2px solid var(--bdr-btn-danger-dk)', borderBottom: '2px solid var(--bdr-btn-danger-dk)', color: '#fff', marginRight: '6px' },
+  form:      { background: 'var(--bg-panel)', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)', padding: '12px', marginBottom: '1.5rem' },
+  formTitle: { ...XP_TITLE, display: 'block', marginBottom: '10px' },
+  row:       { marginBottom: '8px' },
+  label:     { display: 'block', fontSize: '11px', color: 'var(--clr-text-dim)', marginBottom: '2px', fontFamily: 'Tahoma,sans-serif' },
+  input:     XP_INPUT,
+  textarea:  { ...XP_INPUT, minHeight: '120px', resize: 'vertical' },
+  error:     { color: 'var(--clr-err)', fontSize: '11px', margin: '6px 0', fontFamily: 'Tahoma,sans-serif' },
+  jsonErr:   { color: 'var(--clr-err)', fontSize: '10px', fontFamily: 'Tahoma,sans-serif' },
 }
 
 const EMPTY_FORM = {

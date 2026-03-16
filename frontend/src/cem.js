@@ -164,10 +164,14 @@ function parseBox(box, mat, tw, th, inv, mirrorU) {
 
   // When an axis is inverted the box centre moves to the opposite side, so the
   // face that was pointing outward now points inward — swap the UV pair.
-  if (inv.includes('x')) {
+  // Only swap when BOTH axis inversion AND U-mirror are active together.
+  // Blockbench pre-swaps east/west UV assignments when mirrorTexture:"u" +
+  // invertAxis:"x" are combined, so we must swap to match.
+  // Without mirrorTexture the UV assignments are straight (no swap needed).
+  if (mirrorU && inv.includes('x')) {
     ;[uvFaces.east, uvFaces.west] = [uvFaces.west, uvFaces.east]
   }
-  if (inv.includes('z')) {
+  if (mirrorU && inv.includes('z')) {
     ;[uvFaces.north, uvFaces.south] = [uvFaces.south, uvFaces.north]
   }
 

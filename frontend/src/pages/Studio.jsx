@@ -18,67 +18,80 @@ const FACES = ['north', 'south', 'east', 'west', 'up', 'down']
 
 // ── styles ────────────────────────────────────────────────────────────────────
 
+const XP_RAISED  = { borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)' }
+const XP_SUNKEN  = { borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)' }
+const XP_TITLE   = { background: 'var(--bg-title)', color: 'var(--clr-text-on-title)', padding: '2px 8px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'Tahoma,sans-serif', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--bdr-dk)' }
+const XP_BTN_SM  = { padding: '2px 8px', background: 'var(--bg-btn)', ...{ borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)' }, color: 'var(--clr-text)', cursor: 'pointer', fontSize: '11px', fontFamily: 'Tahoma,sans-serif', fontWeight: 'bold' }
+const XP_INPUT   = { padding: '3px 6px', background: 'var(--bg-input)', color: 'var(--clr-text)', ...{ borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)' }, fontFamily: 'Tahoma,sans-serif', fontSize: '11px' }
+
 const s = {
-  page:        { display: 'flex', flexDirection: 'column', height: 'calc(100vh - 48px)' },
-  topBar:      { display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem 0', flexShrink: 0, borderBottom: '1px solid #222' },
-  content:     { flex: 1, display: 'flex', gap: '1rem', overflow: 'hidden', paddingTop: '0.75rem' },
-  sidebar:     { width: '240px', flexShrink: 0, display: 'flex', flexDirection: 'column' },
-  tabBar:      { display: 'flex', gap: '2px', background: '#111', border: '1px solid #222', borderRadius: '6px', padding: '3px', flexShrink: 0, marginBottom: '0.5rem' },
-  tab:         { flex: 1, padding: '5px 0', textAlign: 'center', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 'bold', cursor: 'pointer', border: 'none', fontFamily: 'monospace' },
-  tabContent:  { flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' },
-  mainCompose: { flex: 1, borderRadius: '6px', border: '1px solid #333', overflow: 'hidden' },
-  mainUV:      { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' },
-  mainTex:     { flex: 1, overflow: 'auto', padding: '1rem', borderRadius: '6px', border: '1px solid #333' },
-  saveBar:     { flexShrink: 0, display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', padding: '0.6rem 0', borderTop: '1px solid #222' },
-  section:     { background: '#161616', border: '1px solid #2a2a2a', borderRadius: '6px', overflow: 'hidden', flexShrink: 0 },
-  secHead:     { background: '#1e1e1e', borderBottom: '1px solid #2a2a2a', padding: '5px 10px', fontSize: '0.75rem', fontWeight: 'bold', color: '#f90', textTransform: 'uppercase', letterSpacing: '0.05em' },
-  secBody:     { padding: '6px 10px' },
-  select:      { width: '100%', padding: '5px 8px', background: '#111', color: '#eee', border: '1px solid #444', borderRadius: '4px', fontFamily: 'monospace', fontSize: '0.82rem' },
-  selectSm:    { padding: '5px 8px', background: '#111', color: '#eee', border: '1px solid #444', borderRadius: '4px', fontFamily: 'monospace' },
-  label:       { color: '#888', fontSize: '0.82rem' },
-  input:       { padding: '5px 8px', background: '#111', color: '#eee', border: '1px solid #444', borderRadius: '4px', fontFamily: 'monospace', fontSize: '0.85rem' },
-  inputFull:   { padding: '5px 8px', background: '#111', color: '#eee', border: '1px solid #444', borderRadius: '4px', fontFamily: 'monospace', fontSize: '0.82rem', width: '100%', boxSizing: 'border-box' },
-  btn:         { padding: '6px 16px', background: '#f90', color: '#000', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'monospace' },
-  btnSm:       { padding: '3px 8px', background: '#252525', color: '#888', border: '1px solid #333', borderRadius: '3px', cursor: 'pointer', fontSize: '0.72rem' },
-  badge:       { display: 'inline-block', background: '#1a2a3a', border: '1px solid #2a4a6a', color: '#6cf', borderRadius: '3px', padding: '1px 6px', fontSize: '0.75rem', marginRight: 3 },
-  ok:          { color: '#6f6', fontSize: '0.82rem' },
-  err:         { color: '#f66', fontSize: '0.82rem' },
+  page:        { display: 'flex', flexDirection: 'column', height: 'calc(100vh - 48px)', background: 'var(--bg-window)', margin: '-1.5rem -2rem', overflow: 'hidden' },
+  topBar:      { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', flexShrink: 0, borderBottom: '2px solid var(--bdr-dk)', background: 'var(--bg-panel)' },
+  content:       { flex: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden' },
+  sidebar:       { flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)', overflow: 'hidden' },
+  centerPanel:   { flex: 1, position: 'relative', overflow: 'hidden' },
+  divider:       { width: '4px', flexShrink: 0, cursor: 'col-resize', background: 'var(--bdr-dk)', userSelect: 'none' },
+  rightPanel:    { flexShrink: 0, overflow: 'auto', padding: '12px', background: 'var(--bg-window)' },
+  rightPanelTex: { flexShrink: 0, overflow: 'auto', padding: '1rem', background: '#1a1a1a' },
+  tabBar:      { display: 'flex', gap: '2px', background: 'var(--bg-panel)', borderBottom: '2px solid var(--bdr-dk)', padding: '4px 4px 0', flexShrink: 0 },
+  tab:         { flex: 1, padding: '3px 0', textAlign: 'center', borderRadius: '3px 3px 0 0', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: '1px solid var(--bdr-dk)', borderBottom: 'none', fontFamily: 'Tahoma,sans-serif', background: 'var(--bg-panel-alt)', color: 'var(--clr-text-dim)' },
+  tabContent:  { flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', background: 'var(--bg-panel)', padding: '4px', borderTop: 'none', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)' },
+  saveBar:     { flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '4px', padding: '6px', borderTop: '2px solid var(--bdr-dk)', background: 'var(--bg-panel)' },
+  section:     { background: 'var(--bg-window)', overflow: 'hidden', flexShrink: 0, ...XP_RAISED },
+  secHead:     XP_TITLE,
+  secBody:     { padding: '6px 8px' },
+  select:      { ...XP_INPUT, width: '100%', boxSizing: 'border-box' },
+  selectSm:    { ...XP_INPUT },
+  label:       { color: 'var(--clr-text-dim)', fontSize: '11px', fontFamily: 'Tahoma,sans-serif' },
+  input:       { ...XP_INPUT },
+  inputFull:   { ...XP_INPUT, width: '100%', boxSizing: 'border-box' },
+  btn:         { padding: '4px 16px', background: 'var(--bg-btn-primary)', borderTop: '2px solid var(--bdr-btn-primary-lt)', borderLeft: '2px solid var(--bdr-btn-primary-lt)', borderRight: '2px solid var(--bdr-btn-primary-dk)', borderBottom: '2px solid var(--bdr-btn-primary-dk)', color: '#fff', fontFamily: 'Tahoma,sans-serif', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' },
+  btnSm:       XP_BTN_SM,
+  badge:       { display: 'inline-block', background: 'var(--clr-badge-bg)', border: '1px solid var(--clr-badge-border)', color: 'var(--clr-badge-text)', padding: '1px 5px', fontSize: '10px', fontFamily: 'Tahoma,sans-serif', marginRight: 3 },
+  ok:          { color: 'var(--clr-ok)', fontSize: '11px', fontFamily: 'Tahoma,sans-serif' },
+  err:         { color: 'var(--clr-err)', fontSize: '11px', fontFamily: 'Tahoma,sans-serif' },
   // compose
-  slotBox:     { background: '#161616', border: '1px solid #2a2a2a', borderRadius: '6px', overflow: 'hidden', flexShrink: 0 },
-  slotHeader:  { display: 'flex', alignItems: 'center', padding: '6px 10px', background: '#1e1e1e', borderBottom: '1px solid #2a2a2a' },
-  slotTitle:   { flex: 1, fontSize: '0.8rem', fontWeight: 'bold', color: '#f90', textTransform: 'uppercase', letterSpacing: '0.05em' },
-  slotBody:    { padding: '6px 10px' },
-  radioRow:    { display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 0', cursor: 'pointer', userSelect: 'none' },
-  radioActive: { fontSize: '0.85rem', color: '#fff' },
-  radioInact:  { fontSize: '0.85rem', color: '#555' },
-  emptySlot:   { fontSize: '0.75rem', color: '#444', padding: '4px 0' },
+  slotBox:     { background: 'var(--bg-window)', overflow: 'hidden', flexShrink: 0, ...XP_RAISED },
+  slotHeader:  { display: 'flex', alignItems: 'center', padding: '2px 8px', ...XP_TITLE, textTransform: 'uppercase' },
+  slotTitle:   { flex: 1, fontSize: '11px', fontWeight: 'bold', color: 'var(--clr-text-on-title)', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'Tahoma,sans-serif' },
+  slotBody:    { padding: '4px 8px' },
+  miniViewer:  { height: '90px', background: '#1a1a2e', position: 'relative', overflow: 'hidden', flexShrink: 0 },
+  slotNav:     { display: 'flex', alignItems: 'center', gap: '3px', padding: '3px 4px', borderTop: '1px solid var(--bdr-dk)', flexShrink: 0 },
+  slotNavBtn:  { padding: '1px 7px', background: 'var(--bg-btn)', borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', cursor: 'pointer', fontSize: '10px', fontFamily: 'Tahoma,sans-serif', flexShrink: 0 },
+  partLabel:   { flex: 1, textAlign: 'center', fontSize: '10px', fontFamily: 'Tahoma,sans-serif', color: 'var(--clr-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 },
+  radioRow:    { display: 'flex', alignItems: 'center', gap: '6px', padding: '2px 0', cursor: 'pointer', userSelect: 'none', justifyContent: 'space-between' },
+  editBtns:    { display: 'flex', gap: '2px', flexShrink: 0 },
+  editBtn:     { padding: '1px 5px', background: 'var(--bg-btn)', borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', cursor: 'pointer', fontSize: '9px', fontFamily: 'Tahoma,sans-serif', fontWeight: 'bold' },
+  radioActive: { fontSize: '11px', color: 'var(--clr-text)', fontFamily: 'Tahoma,sans-serif' },
+  radioInact:  { fontSize: '11px', color: 'var(--clr-text-dim)', fontFamily: 'Tahoma,sans-serif' },
+  emptySlot:   { fontSize: '11px', color: 'var(--clr-text-dim)', padding: '3px 0', fontFamily: 'Tahoma,sans-serif' },
   addSlotRow:  { display: 'flex', gap: '4px', alignItems: 'center' },
-  manageBox:   { background: '#111', border: '1px solid #222', borderRadius: '6px', padding: '0.6rem', marginTop: '0.25rem' },
-  manageTitle: { fontSize: '0.7rem', color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' },
+  manageBox:   { background: 'var(--bg-panel)', padding: '6px', marginTop: '4px', borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-lt)', borderBottom: '2px solid var(--bdr-lt)' },
+  manageTitle: { fontSize: '10px', color: 'var(--clr-text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px', fontFamily: 'Tahoma,sans-serif' },
   slotRow:     { display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' },
   // uv
-  treeItem:    { padding: '3px 6px', cursor: 'pointer', borderRadius: '3px', fontSize: '0.82rem', userSelect: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-  faceRow:     { display: 'flex', alignItems: 'center', gap: '6px', padding: '3px 0', fontSize: '0.8rem' },
-  dot:         { width: '10px', height: '10px', borderRadius: '2px', flexShrink: 0 },
-  numInput:    { width: '46px', padding: '2px 4px', background: '#111', color: '#eee', border: '1px solid #333', borderRadius: '3px', fontFamily: 'monospace', fontSize: '0.8rem' },
-  offsetRow:   { display: 'flex', gap: '6px', alignItems: 'center', padding: '4px 0', fontSize: '0.8rem' },
-  offsetLabel: { color: '#888', width: '14px', textAlign: 'right', fontSize: '0.72rem' },
+  treeItem:    { padding: '2px 4px', cursor: 'pointer', fontSize: '11px', userSelect: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'Tahoma,sans-serif' },
+  faceRow:     { display: 'flex', alignItems: 'center', gap: '6px', padding: '2px 0', fontSize: '11px' },
+  dot:         { width: '10px', height: '10px', flexShrink: 0 },
+  numInput:    { width: '46px', ...XP_INPUT },
+  offsetRow:   { display: 'flex', gap: '6px', alignItems: 'center', padding: '3px 0', fontSize: '11px' },
+  offsetLabel: { color: 'var(--clr-text-dim)', width: '14px', textAlign: 'right', fontSize: '10px', fontFamily: 'Tahoma,sans-serif' },
   // texture
-  toolRow:     { display: 'flex', gap: '6px', flexWrap: 'wrap' },
-  toolBtn:     { padding: '5px 8px', border: '1px solid #444', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', background: '#1e1e1e', color: '#aaa' },
-  toolAct:     { background: '#2a3a4a', borderColor: '#4a8aaa', color: '#6cf' },
+  toolRow:     { display: 'flex', gap: '4px', flexWrap: 'wrap' },
+  toolBtn:     { ...XP_BTN_SM, padding: '4px 8px' },
+  toolAct:     { background: 'var(--bg-btn-active)', borderTop: '1px solid var(--bdr-dk)', borderLeft: '1px solid var(--bdr-dk)', borderRight: '1px solid var(--bdr-input-lt)', borderBottom: '1px solid var(--bdr-input-lt)', color: 'var(--clr-text)' },
   colorWrap:   { display: 'flex', gap: '8px', alignItems: 'center' },
-  swatch:      { width: '32px', height: '32px', borderRadius: '4px', border: '1px solid #555', cursor: 'pointer', flexShrink: 0 },
-  hexInput:    { flex: 1, padding: '5px 8px', background: '#111', color: '#eee', border: '1px solid #444', borderRadius: '4px', fontFamily: 'monospace', fontSize: '0.82rem' },
-  alphaRow:    { display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px', fontSize: '0.8rem', color: '#888' },
-  alphaSlider: { flex: 1, accentColor: '#f90' },
-  zoomRow:     { display: 'flex', gap: '4px', flexWrap: 'wrap' },
-  zoomBtn:     { padding: '2px 6px', background: '#1e1e1e', border: '1px solid #333', borderRadius: '3px', cursor: 'pointer', fontSize: '0.72rem', color: '#888' },
-  zoomAct:     { borderColor: '#f90', color: '#f90' },
+  swatch:      { width: '32px', height: '32px', ...XP_SUNKEN, cursor: 'pointer', flexShrink: 0 },
+  hexInput:    { ...XP_INPUT, flex: 1 },
+  alphaRow:    { display: 'flex', gap: '6px', alignItems: 'center', marginTop: '4px', fontSize: '11px', color: 'var(--clr-text-dim)', fontFamily: 'Tahoma,sans-serif' },
+  alphaSlider: { flex: 1, accentColor: 'var(--clr-accent)' },
+  zoomRow:     { display: 'flex', gap: '3px', flexWrap: 'wrap' },
+  zoomBtn:     { ...XP_BTN_SM, padding: '2px 5px', fontSize: '10px' },
+  zoomAct:     { background: 'var(--bg-btn-active)', borderTop: '1px solid var(--bdr-dk)', borderLeft: '1px solid var(--bdr-dk)', borderRight: '1px solid var(--bdr-input-lt)', borderBottom: '1px solid var(--bdr-input-lt)', color: 'var(--clr-text)', fontWeight: 'bold' },
   histRow:     { display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px' },
-  histSwatch:  { width: '18px', height: '18px', borderRadius: '2px', border: '1px solid #333', cursor: 'pointer', flexShrink: 0 },
+  histSwatch:  { width: '18px', height: '18px', ...XP_SUNKEN, cursor: 'pointer', flexShrink: 0 },
   canvasWrap:  { imageRendering: 'pixelated', cursor: 'crosshair', display: 'inline-block' },
-  infoRow:     { fontSize: '0.72rem', color: '#555', marginTop: '4px' },
+  infoRow:     { fontSize: '10px', color: 'var(--clr-text-dim)', marginTop: '4px', fontFamily: 'Tahoma,sans-serif' },
 }
 
 // ── UV helpers ────────────────────────────────────────────────────────────────
@@ -157,6 +170,20 @@ function buildVirtualJem(bodyData, activeParts) {
   return jem
 }
 
+function partToMiniJem(part) {
+  const meta = part.attachment_meta || {}
+  const texPath = meta.textureFile || meta.texture || null
+  const entry = Object.fromEntries(Object.entries(meta).filter(([k]) => k !== 'model'))
+  // jemToScene/collectTexturePaths use "texture" key; attachment_meta often uses "textureFile"
+  if (!entry.texture && entry.textureFile) entry.texture = entry.textureFile
+  entry.submodels = [part.part_data]
+  return {
+    ...(texPath ? { texture: texPath } : {}),
+    textureSize: meta.textureSize || [64, 32],
+    models: [entry],
+  }
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Studio() {
@@ -177,6 +204,11 @@ export default function Studio() {
   const [newSlot,    setNewSlot]    = useState({ name: '', display_name: '', order: '' })
   const [slotStatus, setSlotStatus] = useState('')
 
+  // ── Panel resize ──────────────────────────────────────────────────────────────
+  const [leftWidth,  setLeftWidth]  = useState(244)
+  const [rightWidth, setRightWidth] = useState(320)
+  const dragRef2 = useRef(null) // { side:'left'|'right', startX, startW }
+
   // ── UV ────────────────────────────────────────────────────────────────────────
   const [uvSrc,       setUvSrc]       = useState('part')
   const [uvPartId,    setUvPartId]    = useState(null)
@@ -194,7 +226,9 @@ export default function Studio() {
   const [uvStatus,    setUvStatus]    = useState('')
 
   // ── Texture ───────────────────────────────────────────────────────────────────
+  const [variants,     setVariants]     = useState([])
   const [texPartId,    setTexPartId]    = useState('')
+  const [texVariantId, setTexVariantId] = useState('')
   const [texPath,      setTexPath]      = useState('')
   const [zoom,         setZoom]         = useState(8)
   const [tool,         setTool]         = useState('pencil')
@@ -216,6 +250,7 @@ export default function Studio() {
       if (ps.length) { setUvPartId(ps[0].id); setTexPartId(String(ps[0].id)) }
     })
     api.getSlots().then(setSlots)
+    api.getVariants().then(setVariants)
   }, [])
 
   // ── Compose computed ──────────────────────────────────────────────────────────
@@ -244,6 +279,11 @@ export default function Studio() {
     if (!currentBody) return null
     return buildVirtualJem(currentBody.body_data, activeParts)
   }, [currentBody, activeParts])
+
+  // ── Dirty tracking ────────────────────────────────────────────────────────────
+  const [uvDirty,  setUvDirty]  = useState(false)
+  const [texDirty, setTexDirty] = useState(false)
+  const isDirty = uvDirty || texDirty
 
   // ── UV effects ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -301,6 +341,7 @@ export default function Studio() {
       setPartData(setBoxInPartData(partData, entry.path, updatedBox))
     else if (uvSrc === 'body' && bodyData)
       setBodyData(setBoxInBodyData(bodyData, bodyModelIdx, entry.path, updatedBox))
+    setUvDirty(true)
   }
 
   function getUvFaceCoords() {
@@ -332,14 +373,14 @@ export default function Studio() {
         await api.patchBody(bodyId, { body_data: bodyData })
         setOrigBodyData(bodyData)
       }
-      setUvStatus('ok')
+      setUvStatus('ok'); setUvDirty(false)
     } catch (e) { setUvStatus(e.message) }
   }
 
   function uvRevert() {
     if (uvSrc === 'part') setPartData(origPartData)
     else setBodyData(origBodyData)
-    setUvStatus('')
+    setUvStatus(''); setUvDirty(false)
   }
 
   const uvFaceCoords = getUvFaceCoords()
@@ -405,11 +446,11 @@ export default function Studio() {
     const ctx = buf.getContext('2d')
     if (tool === 'pencil') {
       const [r,g,b] = hexToRgba(color)
-      ctx.clearRect(px,py,1,1); ctx.fillStyle = rgbaToSwatchCss(r,g,b,alpha); ctx.fillRect(px,py,1,1); redraw()
+      ctx.clearRect(px,py,1,1); ctx.fillStyle = rgbaToSwatchCss(r,g,b,alpha); ctx.fillRect(px,py,1,1); redraw(); setTexDirty(true)
     } else if (tool === 'fill') {
       const imgData = ctx.getImageData(0,0,buf.width,buf.height)
       const [r,g,b] = hexToRgba(color); floodFill(imgData,px,py,r,g,b,alpha)
-      ctx.putImageData(imgData,0,0); redraw()
+      ctx.putImageData(imgData,0,0); redraw(); setTexDirty(true)
     } else if (tool === 'eye') {
       const d = ctx.getImageData(px,py,1,1).data
       const hex = rgbaToHex(d[0],d[1],d[2])
@@ -426,12 +467,33 @@ export default function Studio() {
   function onTexUp()     { drawingRef.current=false }
   function onTexLeave()  { drawingRef.current=false; setHoverPixel(null) }
 
+  const bodyVariants = useMemo(() =>
+    variants.filter(v => currentBody && v.body_name === currentBody.name),
+    [variants, currentBody])
+
   async function texSave() {
     if (!bufRef.current||!texPath) { setTexStatus('No texture loaded.'); return }
     setTexStatus('')
     bufRef.current.toBlob(async blob => {
-      try { await api.saveTexture(texPath, blob); setTexStatus('ok') }
+      try { await api.saveTexture(texPath, blob); setTexStatus('ok'); setTexDirty(false) }
       catch (e) { setTexStatus(e.message) }
+    }, 'image/png')
+  }
+
+  async function texSaveVariant() {
+    if (!bufRef.current) { setTexStatus('No texture loaded.'); return }
+    if (!texVariantId) { setTexStatus('Select a variant first.'); return }
+    const variant = variants.find(v => String(v.id) === texVariantId)
+    if (!variant || !currentBody) return
+    setTexStatus('')
+    bufRef.current.toBlob(async blob => {
+      try {
+        await api.saveVariantTexture(currentBody.name, variant.id, variant.file_name, blob)
+        setVariants(vs => vs.map(v => v.id === variant.id
+          ? { ...v, texture_override: `minecraft:optifine/cem/${currentBody.name}/variants/${variant.file_name}.png` }
+          : v))
+        setTexStatus('ok'); setTexDirty(false)
+      } catch (e) { setTexStatus(e.message) }
     }, 'image/png')
   }
 
@@ -443,6 +505,11 @@ export default function Studio() {
   // ── Compose logic ─────────────────────────────────────────────────────────────
   function pickSlot(slotName, partId) {
     setSlotSel(prev => ({ ...prev, [slotName]: prev[slotName]===partId ? null : partId }))
+  }
+  function stepSlotPart(slotName, dir) {
+    const opts = [null, ...(partsBySlot[slotName] || []).map(p => p.id)]
+    const idx = opts.indexOf(slotSel[slotName] || null)
+    setSlotSel(prev => ({ ...prev, [slotName]: opts[(idx + dir + opts.length) % opts.length] }))
   }
   function toggleExtra(partId) {
     setExtraSel(prev => { const n=new Set(prev); n.has(partId)?n.delete(partId):n.add(partId); return n })
@@ -469,6 +536,61 @@ export default function Studio() {
     await api.deleteSlot(id); setSlots(sl => sl.filter(s=>s.id!==id))
   }
 
+  // ── Panel resize ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    function onMove(e) {
+      if (!dragRef2.current) return
+      const { side, startX, startW } = dragRef2.current
+      const dx = e.clientX - startX
+      if (side === 'left')  setLeftWidth(Math.max(160, Math.min(480, startW + dx)))
+      if (side === 'right') setRightWidth(Math.max(200, Math.min(600, startW - dx)))
+    }
+    function onUp() { dragRef2.current = null }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
+  }, [])
+
+  // ── Leave guard ───────────────────────────────────────────────────────────────
+  const isDirtyRef = useRef(isDirty)
+  useEffect(() => { isDirtyRef.current = isDirty }, [isDirty])
+
+  useEffect(() => {
+    const MSG = 'You have unsaved changes in Studio. Leave without saving?'
+
+    // (1) Browser close / refresh
+    const onBeforeUnload = (e) => {
+      if (!isDirtyRef.current) return
+      e.preventDefault(); e.returnValue = ''
+    }
+
+    // (2) React Router NavLink clicks — intercept history.pushState
+    const origPush = window.history.pushState.bind(window.history)
+    window.history.pushState = (...args) => {
+      const url = typeof args[2] === 'string' ? args[2] : ''
+      if (isDirtyRef.current && url && !url.includes('/studio')) {
+        if (!confirm(MSG)) return
+      }
+      origPush(...args)
+    }
+
+    // (3) Browser back / forward
+    const onPopState = () => {
+      if (!isDirtyRef.current) return
+      if (!confirm(MSG)) {
+        window.history.pushState(null, '', window.location.href)
+      }
+    }
+
+    window.addEventListener('beforeunload', onBeforeUnload)
+    window.addEventListener('popstate', onPopState)
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload)
+      window.removeEventListener('popstate', onPopState)
+      window.history.pushState = origPush
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Render ────────────────────────────────────────────────────────────────────
   const texBuf = bufRef.current
   const [cR, cG, cB] = hexToRgba(color)
@@ -485,22 +607,25 @@ export default function Studio() {
         <span style={{ marginLeft: 'auto' }}>
           {activeParts.length
             ? activeParts.map(p => <span key={p.id} style={s.badge}>+{p.name}</span>)
-            : <span style={{ color:'#333', fontSize:'0.8rem' }}>no parts selected</span>}
+            : <span style={{ color:'var(--clr-text-dim)', fontSize:'11px', fontFamily:'Tahoma,sans-serif' }}>no parts selected</span>}
         </span>
       </div>
 
       {/* Content */}
       <div style={s.content}>
 
-        {/* ── Sidebar ── */}
-        <div style={s.sidebar}>
+        {/* ── Left panel ── */}
+        <div style={{ ...s.sidebar, width: leftWidth }}>
 
           {/* Tab bar */}
           <div style={s.tabBar}>
-            {[['compose','Compose'],['uv','UV'],['texture','Texture']].map(([id,label]) => (
-              <button key={id} style={{ ...s.tab, background: tab===id ? '#f90':'transparent', color: tab===id ? '#000':'#555' }}
-                onClick={() => setTab(id)}>{label}</button>
-            ))}
+            {[['compose','Compose'],['uv','UV'],['texture','Texture']].map(([id,label]) => {
+              const dirty = (id==='uv'&&uvDirty)||(id==='texture'&&texDirty)
+              return (
+                <button key={id} style={{ ...s.tab, background: tab===id ? 'var(--bg-window)':'var(--bg-panel-alt)', color: tab===id ? 'var(--clr-text)':'var(--clr-text-dim)', fontWeight: tab===id ? 'bold':'normal' }}
+                  onClick={() => setTab(id)}>{label}{dirty ? ' *' : ''}</button>
+              )
+            })}
           </div>
 
           {/* Tab content */}
@@ -511,24 +636,36 @@ export default function Studio() {
               {slots.map(slot => {
                 const slotParts = partsBySlot[slot.name] || []
                 const selected  = slotSel[slot.name] || null
+                const selPart   = slotParts.find(p => p.id === selected) || null
+                const miniJem   = selPart ? partToMiniJem(selPart) : null
                 return (
                   <div key={slot.id} style={s.slotBox}>
                     <div style={s.slotHeader}><span style={s.slotTitle}>{slot.display_name}</span></div>
-                    <div style={s.slotBody}>
-                      <div style={s.radioRow} onClick={() => pickSlot(slot.name, null)}>
-                        <input type="radio" readOnly checked={!selected} />
-                        <span style={!selected ? s.radioActive : s.radioInact}>(none)</span>
-                      </div>
-                      {slotParts.length === 0
-                        ? <div style={s.emptySlot}>No parts — assign slot "{slot.name}" on Parts page.</div>
-                        : slotParts.map(p => (
-                            <div key={p.id} style={s.radioRow} onClick={() => pickSlot(slot.name, p.id)}>
-                              <input type="radio" readOnly checked={selected===p.id} />
-                              <span style={selected===p.id ? s.radioActive : s.radioInact}>{p.name}</span>
-                            </div>
-                          ))
+
+                    {/* Mini JPM viewer */}
+                    <div style={s.miniViewer}>
+                      {miniJem
+                        ? <CemViewer jem={miniJem} onError={()=>{}} autoRotate sidebarOffset={0} showGrid={false} showAxes={false} fitScale={0.55} enableZoom={false} />
+                        : <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.25)', fontSize:'10px', fontFamily:'Tahoma,sans-serif' }}>none</div>
                       }
                     </div>
+
+                    {/* Prev / part name / Next + edit buttons */}
+                    <div style={s.slotNav}>
+                      <button style={s.slotNavBtn} onClick={() => stepSlotPart(slot.name, -1)}>◀</button>
+                      <span style={s.partLabel}>{selPart?.name ?? '(none)'}</span>
+                      {selPart && (
+                        <div style={s.editBtns}>
+                          <button style={s.editBtn} title="Edit UV" onClick={() => { setTab('uv'); setUvSrc('part'); setUvPartId(selPart.id) }}>UV</button>
+                          <button style={s.editBtn} title="Edit texture" onClick={() => { setTab('texture'); setTexPartId(String(selPart.id)) }}>Tex</button>
+                        </div>
+                      )}
+                      <button style={s.slotNavBtn} onClick={() => stepSlotPart(slot.name, 1)}>▶</button>
+                    </div>
+
+                    {slotParts.length === 0 && (
+                      <div style={{ ...s.emptySlot, padding:'4px 8px' }}>No parts in slot.</div>
+                    )}
                   </div>
                 )
               })}
@@ -538,9 +675,16 @@ export default function Studio() {
                   <div style={s.slotHeader}><span style={s.slotTitle}>Extras</span></div>
                   <div style={s.slotBody}>
                     {standaloneParts.map(p => (
-                      <div key={p.id} style={s.radioRow} onClick={() => toggleExtra(p.id)}>
-                        <input type="checkbox" readOnly checked={extraSel.has(p.id)} />
-                        <span style={extraSel.has(p.id) ? s.radioActive : s.radioInact}>{p.name}</span>
+                      <div key={p.id} style={s.radioRow}>
+                        <div style={{ display:'flex', alignItems:'center', gap:'6px', flex:1, cursor:'pointer' }}
+                          onClick={() => toggleExtra(p.id)}>
+                          <input type="checkbox" readOnly checked={extraSel.has(p.id)} />
+                          <span style={extraSel.has(p.id) ? s.radioActive : s.radioInact}>{p.name}</span>
+                        </div>
+                        <div style={s.editBtns} onClick={e => e.stopPropagation()}>
+                          <button style={s.editBtn} title="Edit UV" onClick={() => { setTab('uv'); setUvSrc('part'); setUvPartId(p.id) }}>UV</button>
+                          <button style={s.editBtn} title="Edit texture" onClick={() => { setTab('texture'); setTexPartId(String(p.id)) }}>Tex</button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -556,14 +700,14 @@ export default function Studio() {
                     <div style={s.manageTitle}>Slots</div>
                     {slots.map(sl => (
                       <div key={sl.id} style={s.slotRow}>
-                        <span style={{ fontSize:'0.8rem', flex:1, color:'#aaa' }}>
-                          <span style={{ color:'#f90' }}>{sl.display_name}</span>
-                          <span style={{ color:'#444' }}> · {sl.name}</span>
+                        <span style={{ fontSize:'11px', flex:1, color:'var(--clr-text)', fontFamily:'Tahoma,sans-serif' }}>
+                          <span style={{ color:'var(--clr-accent)', fontWeight:'bold' }}>{sl.display_name}</span>
+                          <span style={{ color:'var(--clr-text-dim)' }}> · {sl.name}</span>
                         </span>
                         <button style={s.btnSm} onClick={() => deleteSlot(sl.id)}>✕</button>
                       </div>
                     ))}
-                    <div style={{ marginTop:'8px', fontSize:'0.72rem', color:'#555', marginBottom:'4px' }}>Add slot</div>
+                    <div style={{ marginTop:'8px', fontSize:'0.72rem', color:'var(--clr-text-dim)', marginBottom:'4px' }}>Add slot</div>
                     <div style={s.addSlotRow}>
                       <input style={{ ...s.input, width:'60px' }} placeholder="name" value={newSlot.name} onChange={e=>setNewSlot(n=>({...n,name:e.target.value}))} />
                       <input style={{ ...s.input, flex:1 }} placeholder="Display" value={newSlot.display_name} onChange={e=>setNewSlot(n=>({...n,display_name:e.target.value}))} />
@@ -581,7 +725,7 @@ export default function Studio() {
               {/* Source toggle */}
               <div style={{ ...s.tabBar, margin: 0 }}>
                 {[['part','Part (JPM)'],['body','Body (JEM)']].map(([src,label]) => (
-                  <button key={src} style={{ ...s.tab, background: uvSrc===src?'#2a3a4a':'transparent', color: uvSrc===src?'#6cf':'#555' }}
+                  <button key={src} style={{ ...s.tab, background: uvSrc===src?'var(--clr-accent)':'var(--bg-panel-alt)', color: uvSrc===src?'#fff':'var(--clr-text-dim)' }}
                     onClick={() => setUvSrc(src)}>{label}</button>
                 ))}
               </div>
@@ -605,9 +749,9 @@ export default function Studio() {
                 <div style={s.secHead}>Boxes ({uvBoxes.length})</div>
                 <div style={{ ...s.secBody, maxHeight:'180px', overflowY:'auto' }}>
                   {uvBoxes.length === 0
-                    ? <span style={{ color:'#444', fontSize:'0.8rem' }}>No boxes</span>
+                    ? <span style={{ color:'var(--clr-text-dim)', fontSize:'0.8rem' }}>No boxes</span>
                     : uvBoxes.map((entry, i) => (
-                        <div key={entry.path} style={{ ...s.treeItem, background: i===uvBoxIdx?'#2a3a4a':'transparent', color: i===uvBoxIdx?'#6cf':'#888' }}
+                        <div key={entry.path} style={{ ...s.treeItem, background: i===uvBoxIdx?'var(--clr-accent)':'transparent', color: i===uvBoxIdx?'#fff':'var(--clr-text-dim)' }}
                           onClick={() => { setUvBoxIdx(i); setSelFace(null) }} title={entry.path}>
                           {entry.path}
                         </div>
@@ -620,10 +764,10 @@ export default function Studio() {
                 <div style={s.secHead}>Faces</div>
                 <div style={s.secBody}>
                   {FACES.map(face => (
-                    <div key={face} style={{ ...s.faceRow, cursor:'pointer', opacity: uvBox?1:0.3, background: selFace===face?'#1a2a3a':'transparent', borderRadius:'3px', padding:'3px 4px' }}
+                    <div key={face} style={{ ...s.faceRow, cursor:'pointer', opacity: uvBox?1:0.3, background: selFace===face?'var(--clr-accent)':'transparent', borderRadius:'2px', padding:'2px 4px' }}
                       onClick={() => uvBox && setSelFace(face)}>
                       <div style={{ ...s.dot, background: FACE_COLORS[face] }} />
-                      <span style={{ color: selFace===face?'#fff':'#888', flex:1, fontSize:'0.8rem' }}>{face.toUpperCase()}</span>
+                      <span style={{ color: selFace===face?'#fff':'var(--clr-text-dim)', flex:1, fontSize:'11px', fontFamily:'Tahoma,sans-serif' }}>{face.toUpperCase()}</span>
                     </div>
                   ))}
                 </div>
@@ -641,7 +785,7 @@ export default function Studio() {
                             <input type="number" style={s.numInput} value={uvBox.textureOffset[axis]} onChange={e=>setUvOffset(axis,e.target.value)} />
                           </div>
                         ))}
-                        <div style={{ fontSize:'0.7rem', color:'#555', marginTop:'4px' }}>Drag any face to move offset.</div>
+                        <div style={{ fontSize:'0.7rem', color:'var(--clr-text-dim)', marginTop:'4px' }}>Drag any face to move offset.</div>
                       </>
                     ) : uvFaceCoords ? (
                       ['x1','y1','x2','y2'].map((lbl,ci) => (
@@ -651,7 +795,7 @@ export default function Studio() {
                         </div>
                       ))
                     ) : (
-                      <span style={{ color:'#444', fontSize:'0.8rem' }}>Select a face.</span>
+                      <span style={{ color:'var(--clr-text-dim)', fontSize:'0.8rem' }}>Select a face.</span>
                     )}
                   </div>
                 </div>
@@ -677,6 +821,26 @@ export default function Studio() {
                   <input style={{ ...s.inputFull, marginTop:'4px' }} value={texPath}
                     onChange={e=>setTexPath(e.target.value)} placeholder="textures/entity/..." />
                   {texBuf && <div style={s.infoRow}>{texBuf.width} × {texBuf.height} px</div>}
+                </div>
+              </div>
+
+              <div style={s.section}>
+                <div style={s.secHead}>Variant Override</div>
+                <div style={s.secBody}>
+                  <select style={s.select} value={texVariantId} onChange={e=>setTexVariantId(e.target.value)}>
+                    <option value="">— none —</option>
+                    {bodyVariants.map(v => (
+                      <option key={v.id} value={v.id}>
+                        {v.file_name}{v.texture_override ? ' ✓' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {texVariantId && (() => {
+                    const v = variants.find(x => String(x.id) === texVariantId)
+                    return v?.texture_override
+                      ? <div style={{ ...s.infoRow, color:'var(--clr-ok)', marginTop:'4px' }}>Override set</div>
+                      : <div style={{ ...s.infoRow, marginTop:'4px' }}>No override — uses body texture</div>
+                  })()}
                 </div>
               </div>
 
@@ -728,61 +892,73 @@ export default function Studio() {
 
               <div style={{ display:'flex', gap:'6px', alignItems:'center', flexWrap:'wrap' }}>
                 <button style={s.btn} onClick={texSave}>Save PNG</button>
-                {hoverPixel && texBuf && <span style={{ fontSize:'0.72rem', color:'#555' }}>({hoverPixel[0]}, {hoverPixel[1]})</span>}
+                <button style={{ ...s.btn, ...(texVariantId ? {} : { background: 'var(--bg-panel-alt)', borderTopColor:'var(--bdr-lt)', borderLeftColor:'var(--bdr-lt)', borderRightColor:'var(--bdr-dk)', borderBottomColor:'var(--bdr-dk)', color:'var(--clr-text-dim)', cursor:'not-allowed' }) }}
+                  onClick={texSaveVariant} disabled={!texVariantId} title="Save as per-variant texture override">
+                  Save Override
+                </button>
+                {hoverPixel && texBuf && <span style={{ fontSize:'0.72rem', color:'var(--clr-text-dim)' }}>({hoverPixel[0]}, {hoverPixel[1]})</span>}
                 {texStatus==='ok' && <span style={s.ok}>Saved!</span>}
                 {texStatus && texStatus!=='ok' && <span style={s.err}>{texStatus}</span>}
               </div>
             </>}
 
           </div>{/* tabContent */}
-        </div>{/* sidebar */}
 
-        {/* ── Main area ── */}
-        {tab === 'compose' && (
-          <div style={s.mainCompose}>
-            {jem
-              ? <CemViewer key={JSON.stringify(activeParts.map(p=>p.id))} jem={jem} onError={()=>{}} />
-              : <div style={{ color:'#444', padding:'2rem', fontSize:'0.9rem' }}>Select a body to preview.</div>}
-          </div>
-        )}
+          {/* Save bar inside sidebar — compose only */}
+          {tab === 'compose' && (
+            <div style={s.saveBar}>
+              <span style={s.label}>Save as variant</span>
+              <input style={s.inputFull} placeholder="file_name e.g. oak_boat4"
+                value={saveForm.file_name} onChange={e=>setSaveForm(f=>({...f,file_name:e.target.value}))} />
+              <input style={s.inputFull} placeholder="trigger e.g. Duce"
+                value={saveForm.trigger_name} onChange={e=>setSaveForm(f=>({...f,trigger_name:e.target.value}))} />
+              <div style={{ display:'flex', gap:'6px', alignItems:'center' }}>
+                <span style={s.label}>Order</span>
+                <input style={{ ...s.input, width:'50px' }} type="number"
+                  value={saveForm.order} onChange={e=>setSaveForm(f=>({...f,order:Number(e.target.value)}))} />
+              </div>
+              <button style={s.btn} onClick={saveVariant}>Save Variant</button>
+              {saveStatus==='ok' && <span style={s.ok}>Saved!</span>}
+              {saveStatus && saveStatus!=='ok' && <span style={s.err}>{saveStatus}</span>}
+            </div>
+          )}
+        </div>{/* left panel */}
 
-        {tab === 'uv' && (
-          <div style={s.mainUV}>
-            {uvBox
-              ? <UVCanvas img={uvImg} textureSize={uvTexSize} box={uvBox}
-                  selectedFace={selFace} onFaceSelect={setSelFace} onBoxChange={uvHandleBoxChange} />
-              : <div style={{ color:'#444', fontSize:'0.9rem' }}>Select a box to edit UVs.</div>}
-          </div>
-        )}
+        {/* ── Left divider ── */}
+        <div style={s.divider} onMouseDown={e => { e.preventDefault(); dragRef2.current = { side:'left', startX: e.clientX, startW: leftWidth } }} />
 
-        {tab === 'texture' && (
-          <div style={s.mainTex}>
-            {texPath
-              ? <canvas ref={canvasRef} style={s.canvasWrap}
-                  onMouseDown={onTexDown} onMouseMove={onTexMove}
-                  onMouseUp={onTexUp} onMouseLeave={onTexLeave} />
-              : <div style={{ color:'#444', fontSize:'0.9rem' }}>Select a part to load its texture.</div>}
-          </div>
-        )}
+        {/* ── Center: always-on CemViewer ── */}
+        <div style={s.centerPanel}>
+          {jem
+            ? <CemViewer jem={jem} onError={()=>{}} />
+            : <div style={{ color:'var(--clr-text-dim)', padding:'2rem', fontSize:'0.9rem' }}>Select a body to preview.</div>}
+        </div>
+
+        {/* ── Right divider + panel (UV / Texture only) ── */}
+        {tab !== 'compose' && <>
+          <div style={s.divider} onMouseDown={e => { e.preventDefault(); dragRef2.current = { side:'right', startX: e.clientX, startW: rightWidth } }} />
+
+          {tab === 'uv' && (
+            <div style={{ ...s.rightPanel, width: rightWidth }}>
+              {uvBox
+                ? <UVCanvas img={uvImg} textureSize={uvTexSize} box={uvBox}
+                    selectedFace={selFace} onFaceSelect={setSelFace} onBoxChange={uvHandleBoxChange} />
+                : <div style={{ color:'var(--clr-text-dim)', fontSize:'0.9rem' }}>Select a box to edit UVs.</div>}
+            </div>
+          )}
+
+          {tab === 'texture' && (
+            <div style={{ ...s.rightPanelTex, width: rightWidth }}>
+              {texPath
+                ? <canvas ref={canvasRef} style={s.canvasWrap}
+                    onMouseDown={onTexDown} onMouseMove={onTexMove}
+                    onMouseUp={onTexUp} onMouseLeave={onTexLeave} />
+                : <div style={{ color:'var(--clr-text-dim)', fontSize:'0.9rem' }}>Select a part to load its texture.</div>}
+            </div>
+          )}
+        </>}
 
       </div>{/* content */}
-
-      {/* Save bar — compose only */}
-      {tab === 'compose' && (
-        <div style={s.saveBar}>
-          <span style={s.label}>Save as variant</span>
-          <input style={{ ...s.input, width:'140px' }} placeholder="file_name e.g. oak_boat4"
-            value={saveForm.file_name} onChange={e=>setSaveForm(f=>({...f,file_name:e.target.value}))} />
-          <input style={{ ...s.input, width:'110px' }} placeholder="trigger e.g. Duce"
-            value={saveForm.trigger_name} onChange={e=>setSaveForm(f=>({...f,trigger_name:e.target.value}))} />
-          <span style={s.label}>Order</span>
-          <input style={{ ...s.input, width:'50px' }} type="number"
-            value={saveForm.order} onChange={e=>setSaveForm(f=>({...f,order:Number(e.target.value)}))} />
-          <button style={s.btn} onClick={saveVariant}>Save Variant</button>
-          {saveStatus==='ok' && <span style={s.ok}>Saved!</span>}
-          {saveStatus && saveStatus!=='ok' && <span style={s.err}>{saveStatus}</span>}
-        </div>
-      )}
 
     </div>
   )

@@ -6,7 +6,103 @@
     <title>Garage64 Editor</title>
     <style>
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: monospace; background: #111; color: #eee; min-height: 100vh; }
+
+      /* ── XP Light theme (default) ────────────────────────────────────────── */
+      :root {
+        --bg-body:              #3a6ea5;
+        --bg-window:            #ece9d8;
+        --bg-panel:             #d4d0c8;
+        --bg-panel-alt:         #c0bdb8;
+        --bg-section:           #ece9d8;
+        --bg-input:             #ffffff;
+        --bg-btn:               linear-gradient(180deg, #fefefe 0%, #e4e0da 100%);
+        --bg-btn-primary:       linear-gradient(180deg, #4a90d9 0%, #1a5cc8 100%);
+        --bg-btn-danger:        linear-gradient(180deg, #ff8888 0%, #cc0000 100%);
+        --bg-btn-active:        linear-gradient(180deg, #c0d8f0 0%, #90b8e0 100%);
+        --bg-title:             linear-gradient(90deg, #0a246a 0%, #3a7bd5 100%);
+        --clr-text:             #000000;
+        --clr-text-dim:         #555555;
+        --clr-text-on-title:    #ffffff;
+        --clr-accent:           #316ac5;
+        --clr-ok:               #006600;
+        --clr-err:              #cc0000;
+        --clr-badge-bg:         #ddeeff;
+        --clr-badge-border:     #84b0d4;
+        --clr-badge-text:       #003399;
+        --bdr-lt:               #ffffff;
+        --bdr-dk:               #808080;
+        --bdr-input-lt:         #d4d0c8;
+        --bdr-btn-lt:           #ffffff;
+        --bdr-btn-dk:           #808080;
+        --bdr-btn-primary-lt:   #6ab0f9;
+        --bdr-btn-primary-dk:   #0040a0;
+        --bdr-btn-danger-lt:    #ffaaaa;
+        --bdr-btn-danger-dk:    #660000;
+        --scrollbar-bg:         #d4d0c8;
+        --scrollbar-thumb:      linear-gradient(135deg, #f0ede8 0%, #c8c4bc 50%, #b8b4ac 100%);
+        --scrollbar-btn:        #d4d0c8;
+      }
+
+      /* ── Dark theme ──────────────────────────────────────────────────────── */
+      html.dark {
+        --bg-body:              #111111;
+        --bg-window:            #1e1e1e;
+        --bg-panel:             #252525;
+        --bg-panel-alt:         #1a1a1a;
+        --bg-section:           #161616;
+        --bg-input:             #111111;
+        --bg-btn:               linear-gradient(180deg, #3a3a3a 0%, #2a2a2a 100%);
+        --bg-btn-primary:       linear-gradient(180deg, #ff9900 0%, #cc7700 100%);
+        --bg-btn-danger:        linear-gradient(180deg, #ff4444 0%, #aa0000 100%);
+        --bg-btn-active:        linear-gradient(180deg, #1a2a3a 0%, #0a1520 100%);
+        --bg-title:             #1a1a1a;
+        --clr-text:             #eeeeee;
+        --clr-text-dim:         #888888;
+        --clr-text-on-title:    #ff9900;
+        --clr-accent:           #4499ff;
+        --clr-ok:               #66ff66;
+        --clr-err:              #ff6666;
+        --clr-badge-bg:         #1a2a3a;
+        --clr-badge-border:     #2a4a6a;
+        --clr-badge-text:       #6699ff;
+        --bdr-lt:               #444444;
+        --bdr-dk:               #1a1a1a;
+        --bdr-input-lt:         #333333;
+        --bdr-btn-lt:           #555555;
+        --bdr-btn-dk:           #1a1a1a;
+        --bdr-btn-primary-lt:   #ffcc66;
+        --bdr-btn-primary-dk:   #994400;
+        --bdr-btn-danger-lt:    #ff7777;
+        --bdr-btn-danger-dk:    #550000;
+        --scrollbar-bg:         #2a2a2a;
+        --scrollbar-thumb:      linear-gradient(135deg, #444 0%, #333 50%, #222 100%);
+        --scrollbar-btn:        #2a2a2a;
+      }
+
+      body {
+        font-family: Tahoma, 'Segoe UI', sans-serif;
+        font-size: 11px;
+        background: var(--bg-body);
+        color: var(--clr-text);
+        min-height: 100vh;
+      }
+
+      ::-webkit-scrollbar { width: 16px; height: 16px; }
+      ::-webkit-scrollbar-track { background: var(--scrollbar-bg); }
+      ::-webkit-scrollbar-thumb {
+        background: var(--scrollbar-thumb);
+        border-top: 1px solid var(--bdr-lt);
+        border-left: 1px solid var(--bdr-lt);
+        border-right: 1px solid var(--bdr-dk);
+        border-bottom: 1px solid var(--bdr-dk);
+      }
+      ::-webkit-scrollbar-button {
+        display: block; height: 16px; width: 16px;
+        background: var(--scrollbar-btn);
+        border-top: 1px solid var(--bdr-lt); border-left: 1px solid var(--bdr-lt);
+        border-right: 1px solid var(--bdr-dk); border-bottom: 1px solid var(--bdr-dk);
+      }
+      ::-webkit-scrollbar-corner { background: var(--scrollbar-bg); }
     </style>
   </head>
   <body>

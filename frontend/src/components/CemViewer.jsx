@@ -3,40 +3,55 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { jemToScene, collectTexturePaths, normTexPath } from '../cem'
 
-export default function CemViewer({ jem, onError }) {
+function disposeGroup(group) {
+  group.traverse(obj => {
+    if (obj.geometry) obj.geometry.dispose()
+    if (obj.material) {
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
+      mats.forEach(m => { if (m.map) m.map.dispose(); m.dispose() })
+    }
+  })
+}
+
+export default function CemViewer({ jem, onError, autoRotate = false, sidebarOffset = 0, showGrid = true, showAxes = true, fitScale = 1.0, enableZoom = true }) {
   const mountRef = useRef(null)
+  const ctxRef  = useRef(null)   // { scene, camera, controls, renderer, grid, modelGroup, firstLoad }
+  const sidebarOffsetRef = useRef(sidebarOffset)
+  useEffect(() => { sidebarOffsetRef.current = sidebarOffset }, [sidebarOffset])
+  const fitScaleRef = useRef(fitScale)
 
+  // ── One-time scene / camera setup ────────────────────────────────────────
   useEffect(() => {
-    if (!jem) return
-
     const mount = mountRef.current
     const w = mount.clientWidth || 600
     const h = mount.clientHeight || 500
 
-    // ── Renderer ──────────────────────────────────────────────────────────────
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(w, h)
     renderer.setPixelRatio(window.devicePixelRatio)
     mount.appendChild(renderer.domElement)
 
-    // ── Scene ─────────────────────────────────────────────────────────────────
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0x1a1a2e)
-    const grid = new THREE.GridHelper(128, 32, 0x333355, 0x222233)
-    scene.add(grid)
-    scene.add(new THREE.AxesHelper(8))
+    const grid = showGrid ? new THREE.GridHelper(128, 32, 0x333355, 0x222233) : null
+    if (grid) scene.add(grid)
+    if (showAxes) scene.add(new THREE.AxesHelper(8))
 
-    // ── Camera + controls ─────────────────────────────────────────────────────
     const camera = new THREE.PerspectiveCamera(55, w / h, 0.1, 2000)
     camera.position.set(30, 20, 40)
+    if (sidebarOffsetRef.current) {
+      camera.setViewOffset(w, h, -sidebarOffsetRef.current / 2, 0, w, h)
+    }
 
     const controls = new OrbitControls(camera, renderer.domElement)
-    controls.enableDamping = true
-    controls.dampingFactor = 0.08
-    controls.minDistance = 5
-    controls.maxDistance = 400
+    controls.enableDamping    = true
+    controls.dampingFactor    = 0.08
+    controls.minDistance      = 5
+    controls.maxDistance      = 400
+    controls.autoRotate       = autoRotate
+    controls.autoRotateSpeed  = 1.5
+    controls.enableZoom       = enableZoom
 
-    // ── Animation loop ────────────────────────────────────────────────────────
     let animId
     function animate() {
       animId = requestAnimationFrame(animate)
@@ -45,54 +60,21 @@ export default function CemViewer({ jem, onError }) {
     }
     animate()
 
-    // ── Resize observer ───────────────────────────────────────────────────────
     const ro = new ResizeObserver(() => {
-      const w = mount.clientWidth
-      const h = mount.clientHeight
-      camera.aspect = w / h
-      camera.updateProjectionMatrix()
-      renderer.setSize(w, h)
+      const nw = mount.clientWidth
+      const nh = mount.clientHeight
+      if (sidebarOffsetRef.current) {
+        camera.setViewOffset(nw, nh, -sidebarOffsetRef.current / 2, 0, nw, nh)
+      } else {
+        camera.clearViewOffset()
+        camera.aspect = nw / nh
+        camera.updateProjectionMatrix()
+      }
+      renderer.setSize(nw, nh)
     })
     ro.observe(mount)
 
-    // ── Load all textures, then build model ───────────────────────────────────
-    const loader = new THREE.TextureLoader()
-    const rawPaths = collectTexturePaths(jem)
-
-    Promise.all(
-      rawPaths.map(raw =>
-        new Promise(resolve => {
-          const apiPath = normTexPath(raw)
-          loader.load(
-            `/api/asset/?path=${encodeURIComponent(apiPath)}`,
-            tex => resolve([raw, tex]),
-            undefined,
-            () => resolve([raw, null]),   // missing texture → null, don't crash
-          )
-        })
-      )
-    ).then(entries => {
-      const textureMap = Object.fromEntries(entries.filter(([, t]) => t !== null))
-
-      const modelGroup = jemToScene(jem, textureMap)
-
-      // Center the model horizontally, keep bottom at y=0
-      const box = new THREE.Box3().setFromObject(modelGroup)
-      const center = box.getCenter(new THREE.Vector3())
-      modelGroup.position.x -= center.x
-      modelGroup.position.z -= center.z
-      modelGroup.position.y -= box.min.y   // sit on the grid
-
-      // Drop the grid to just below the model
-      grid.position.y = 0
-
-      // Fit camera to model size
-      const size = box.getSize(new THREE.Vector3()).length()
-      camera.position.set(size * 0.8, size * 0.6, size * 1.2)
-      controls.update()
-
-      scene.add(modelGroup)
-    }).catch(e => onError?.(e.message))
+    ctxRef.current = { scene, camera, controls, renderer, grid, modelGroup: null, firstLoad: true }
 
     return () => {
       cancelAnimationFrame(animId)
@@ -100,8 +82,61 @@ export default function CemViewer({ jem, onError }) {
       controls.dispose()
       renderer.dispose()
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement)
+      ctxRef.current = null
     }
-  }, [jem])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Swap model whenever jem changes — camera stays put ────────────────────
+  useEffect(() => {
+    if (!jem || !ctxRef.current) return
+    const ctx = ctxRef.current
+    const { scene, camera, controls, grid } = ctx
+
+    // Remove previous model and free GPU memory
+    if (ctx.modelGroup) {
+      scene.remove(ctx.modelGroup)
+      disposeGroup(ctx.modelGroup)
+      ctx.modelGroup = null
+    }
+
+    const loader = new THREE.TextureLoader()
+    const rawPaths = collectTexturePaths(jem)
+
+    Promise.all(
+      rawPaths.map(raw =>
+        new Promise(resolve => {
+          loader.load(
+            `/api/asset/?path=${encodeURIComponent(normTexPath(raw))}`,
+            tex => resolve([raw, tex]),
+            undefined,
+            ()  => resolve([raw, null]),
+          )
+        })
+      )
+    ).then(entries => {
+      if (!ctxRef.current) return  // unmounted while loading
+      const textureMap = Object.fromEntries(entries.filter(([, t]) => t !== null))
+      const modelGroup = jemToScene(jem, textureMap)
+
+      const box    = new THREE.Box3().setFromObject(modelGroup)
+      const center = box.getCenter(new THREE.Vector3())
+      modelGroup.position.x -= center.x
+      modelGroup.position.z -= center.z
+      modelGroup.position.y -= box.min.y   // sit on grid
+      if (grid) grid.position.y = 0
+
+      // Fit camera only on the very first model load; leave it alone after that
+      if (ctx.firstLoad) {
+        const size = box.getSize(new THREE.Vector3()).length()
+        camera.position.set(size * 0.8 * fitScaleRef.current, size * 0.6 * fitScaleRef.current, size * 1.2 * fitScaleRef.current)
+        controls.update()
+        ctx.firstLoad = false
+      }
+
+      scene.add(modelGroup)
+      ctx.modelGroup = modelGroup
+    }).catch(e => onError?.(e.message))
+  }, [jem]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div

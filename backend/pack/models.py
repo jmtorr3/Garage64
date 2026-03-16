@@ -72,6 +72,9 @@ class CarVariant(models.Model):
     parts = models.ManyToManyField(ModelPart, through='VariantPart', blank=True)
     # order controls the index in the .properties file (1-based, 0 = default)
     order = models.PositiveIntegerField(default=0)
+    # If set, compiled JEM uses this texture path instead of body_data.texture.
+    # Convention: optifine/cem/<car_slug>/variants/<file_name>.png
+    texture_override = models.CharField(max_length=300, blank=True)
 
     def __str__(self):
         return self.file_name

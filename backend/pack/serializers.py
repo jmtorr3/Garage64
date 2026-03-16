@@ -44,7 +44,7 @@ class CarVariantSerializer(serializers.ModelSerializer):
         model = CarVariant
         fields = [
             'id', 'file_name', 'trigger_name', 'body_id', 'body_name',
-            'order', 'variant_parts',
+            'order', 'texture_override', 'variant_parts',
         ]
 
 
@@ -56,7 +56,7 @@ class CarVariantWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CarVariant
-        fields = ['id', 'file_name', 'trigger_name', 'body', 'order', 'part_ids']
+        fields = ['id', 'file_name', 'trigger_name', 'body', 'order', 'texture_override', 'part_ids']
 
     def _set_parts(self, variant, part_ids):
         VariantPart.objects.filter(variant=variant).delete()

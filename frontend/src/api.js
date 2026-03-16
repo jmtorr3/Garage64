@@ -39,6 +39,22 @@ export const api = {
     body: blob,
   }).then(r => { if (!r.ok) throw new Error(`${r.status} ${r.statusText}`); return r.json() }),
 
+  // Save a painted texture for a variant and update texture_override on the variant.
+  // carSlug:   EntityBody.name  e.g. "miata_base"
+  // variantId: CarVariant.id
+  // fileName:  CarVariant.file_name  e.g. "oak_boat3"
+  // blob:      PNG Blob
+  async saveVariantTexture(carSlug, variantId, fileName, blob) {
+    const texPath = `optifine/cem/${carSlug}/variants/${fileName}.png`
+    await api.saveTexture(texPath, blob)
+    return req(`/variants/${variantId}/`, {
+      method: 'PATCH',
+      body: { texture_override: `minecraft:${texPath}` },
+    })
+  },
+
+  patchVariant: (id, data) => req(`/variants/${id}/`, { method: 'PATCH', body: data }),
+
   // Slots
   getSlots: () => req('/slots/'),
   createSlot: (data) => req('/slots/', { method: 'POST', body: data }),

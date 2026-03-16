@@ -103,17 +103,23 @@ After the position negation, that `+hw` face now points **inward** (toward the m
 
 Without correction, the visible outer face of the box (at `−hw`) shows `'west'` UV, which is typically a different (wrong) colour.
 
-**Fix:** swap `uvFaces.east ↔ uvFaces.west` when `inv.includes('x')`.
-Similarly swap `uvFaces.north ↔ uvFaces.south` when `inv.includes('z')`.
+**Fix:** swap `uvFaces.east ↔ uvFaces.west` when **both** `inv.includes('x')` AND `mirrorU` are true.
+Similarly swap `uvFaces.north ↔ uvFaces.south` when `inv.includes('z')` AND `mirrorU`.
 
 ```js
-if (inv.includes('x')) {
+if (mirrorU && inv.includes('x')) {
   ;[uvFaces.east, uvFaces.west] = [uvFaces.west, uvFaces.east]
 }
-if (inv.includes('z')) {
+if (mirrorU && inv.includes('z')) {
   ;[uvFaces.north, uvFaces.south] = [uvFaces.south, uvFaces.north]
 }
 ```
+
+**Why the `mirrorU` guard?**
+Blockbench pre-swaps the east/west UV atlas assignments *only* when `mirrorTexture: "u"` and `invertAxis: "x"` are combined — because the visual mirror in 3D corresponds to a left–right texture flip that Blockbench compensates for at export time. Without `mirrorTexture`, Blockbench assigns face UVs straight (no pre-swap), so no correction is needed here.
+
+- Parts with `mirrorTexture: "u"` + `invertAxis: "x"` (e.g. car body panels) → swap applied → correct exterior colour ✓
+- Parts with `invertAxis: "x"` but **no** `mirrorTexture` (e.g. wheel discs) → no swap → uvEast stays on the east face ✓
 
 This runs **before** `mirrorU` so that U-flipping is applied to the already-swapped faces.
 
