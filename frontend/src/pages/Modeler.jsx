@@ -208,7 +208,7 @@ function Vec3Input({label, value=[0,0,0], step=0.5, onChange}) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack } = {}) {
+export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack, embedded = false } = {}) {
   const [searchParams] = useSearchParams()
   const { isDark } = useTheme()
   const bg = isDark ? '#1e1e1e' : '#ece9d8'
@@ -220,9 +220,10 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
   const partObjRef = useRef(null) // full part object for save
   const [sel,     setSel]     = useState(null)
   const [tcMode,  setTcMode]  = useState('translate')
-  const [dirty,   setDirty]   = useState(false)
-  const [status,  setStatus]  = useState('')
-  const [dataVer, setDataVer] = useState(0) // bumped to force re-render from ref
+  const [dirty,    setDirty]   = useState(false)
+  const [status,   setStatus]  = useState('')
+  const [dataVer,  setDataVer] = useState(0) // bumped to force re-render from ref
+  const [showGrid, setShowGrid] = useState(false)
 
   // Model data lives in a ref so TC sync doesn't trigger rebuilds
   const dataRef    = useRef(null)
@@ -232,6 +233,7 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
   useEffect(()=>{ selRef.current=sel },[sel])
   useEffect(()=>{ tcModeRef.current=tcMode },[tcMode])
   useEffect(()=>{ if (ctxRef.current) ctxRef.current.scene.background=new THREE.Color(bg) },[bg])
+  useEffect(()=>{ if (ctxRef.current?.grid) ctxRef.current.grid.visible=showGrid },[showGrid])
 
   // Three.js
   const mountRef    = useRef(null)
@@ -272,6 +274,7 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
     if (!bodyId || editMode !== 'body') return
     api.getBody(bodyId).then(b=>{
       dataRef.current=b.body_data; origRef.current=b.body_data
+      if (ctxRef.current) ctxRef.current.firstLoad=true
       setDataVer(v=>v+1); setDirty(false); setSel(null); setStatus('')
       loadTexAndRebuild(b.body_data)
     })
@@ -284,6 +287,7 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
       partObjRef.current = p
       const jem = partToJem(p)
       dataRef.current=jem; origRef.current=jem
+      if (ctxRef.current) ctxRef.current.firstLoad=true
       setDataVer(v=>v+1); setDirty(false); setSel(null); setStatus('')
       loadTexAndRebuild(jem)
     })
@@ -299,6 +303,10 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
     mount.appendChild(renderer.domElement)
 
     const scene=new THREE.Scene(); scene.background=new THREE.Color(bg)
+
+    const grid=new THREE.GridHelper(128,32,0x333355,0x222233)
+    grid.visible=false
+    scene.add(grid)
 
     const camera=new THREE.PerspectiveCamera(55,w/h,0.1,2000)
     camera.position.set(30,20,40)
@@ -329,7 +337,7 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
     })
     ro.observe(mount)
 
-    ctxRef.current={scene,camera,renderer,orbit,tc,modelGroup:null,firstLoad:true}
+    ctxRef.current={scene,camera,renderer,orbit,tc,grid,modelGroup:null,firstLoad:true}
 
     return ()=>{
       cancelAnimationFrame(animId); ro.disconnect()
@@ -410,6 +418,12 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
     const group=buildSceneRoot(data,texMapRef.current)
     if (ctx.firstLoad) {
       const box=new THREE.Box3().setFromObject(group)
+      const center=box.getCenter(new THREE.Vector3())
+      group.position.x -= center.x
+      group.position.z -= center.z
+      group.position.y -= box.min.y
+      const modelHeight=box.max.y-box.min.y
+      ctx.orbit.target.set(0, modelHeight/2, 0)
       const size=box.getSize(new THREE.Vector3()).length()
       ctx.camera.position.set(size*.8,size*.6,size*1.2); ctx.orbit.update(); ctx.firstLoad=false
     }
@@ -658,7 +672,7 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div style={s.page}>
+    <div style={embedded ? { flex:1, display:'flex', flexDirection:'column', overflow:'hidden' } : s.page}>
 
       {/* Toolbar */}
       <div style={s.topBar}>
@@ -680,6 +694,8 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
         <div style={s.divider}/>
         <button style={tcMode==='translate'?s.btnAct:s.btnSm} onClick={()=>setTcMode('translate')} title="Move (W)">⤢ Move</button>
         <button style={tcMode==='rotate'   ?s.btnAct:s.btnSm} onClick={()=>setTcMode('rotate')}    title="Rotate (E)">↻ Rotate</button>
+        <div style={s.divider}/>
+        <button style={showGrid?s.btnAct:s.btnSm} onClick={()=>setShowGrid(v=>!v)}>⊞ Grid</button>
         <div style={s.divider}/>
         <button style={s.btnSm} onClick={addCube}>+ Cube</button>
         <button style={{...s.btnSm,opacity:sel?1:0.4}} onClick={deleteSelected} disabled={!sel} title="Delete (Del)">✕ Delete</button>

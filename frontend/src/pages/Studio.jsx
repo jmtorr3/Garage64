@@ -182,7 +182,7 @@ export default function Studio() {
   const dragRef2 = useRef(null) // { side:'left'|'right', startX, startW }
 
   // ── UV ────────────────────────────────────────────────────────────────────────
-  const [editTab,     setEditTab]     = useState('body')    // 'body' | 'part'
+  const [editTab,     setEditTab]     = useState('texture') // 'texture' | 'modeler'
   const [uvPartId,    setUvPartId]    = useState(null)
   const [bodyData,    setBodyData]    = useState(null)
 
@@ -296,17 +296,15 @@ export default function Studio() {
     api.getBody(bodyId).then(b => { setBodyData(b.body_data) })
   }, [bodyId])
 
-  // Sync texPartId and zoom when tab or uvPartId changes
+  // Sync texPartId and zoom when uvPartId changes
   useEffect(() => {
-    if (editTab === 'body') {
+    if (!uvPartId) {
       setTexPartId('__body__'); setZoom(2)
     } else {
-      // Only use uvPartId if it's actually an active part; otherwise default to first active part
-      const validId = activeParts.find(p => p.id === uvPartId)?.id ?? activeParts[0]?.id ?? null
-      if (validId) { setUvPartId(validId); setTexPartId(String(validId)) }
-      else { setTexPartId('') }
+      const validId = activeParts.find(p => p.id === uvPartId)?.id ?? null
+      if (validId) setTexPartId(String(validId))
     }
-  }, [editTab]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [uvPartId]) // eslint-disable-line react-hooks/exhaustive-deps
 
 
   // ── Texture effects ───────────────────────────────────────────────────────────
@@ -801,8 +799,7 @@ export default function Studio() {
                 <button style={s.slotNavBtn} onClick={() => stepBody(-1)}>◀</button>
                 <span style={s.partLabel}>{currentBody?.name ?? '—'}</span>
                 <div style={s.editBtns}>
-                  <button style={s.editBtn} title="Edit UV" onClick={() => setEditTab('body')}>UV</button>
-                  <button style={s.editBtn} title="Edit texture" onClick={() => setEditTab('body')}>Tex</button>
+                  <button style={s.editBtn} title="Edit texture" onClick={() => { setUvPartId(null); setEditTab('texture') }}>Tex</button>
                   <button style={s.editBtn} title="Edit Model" onClick={() => setModelerMode({ bodyId })}>3D</button>
                 </div>
                 <button style={s.slotNavBtn} onClick={() => stepBody(1)}>▶</button>
@@ -828,8 +825,7 @@ export default function Studio() {
                     <span style={s.partLabel}>{selPart?.name ?? 'Create New Part'}</span>
                     {selPart && (
                       <div style={s.editBtns}>
-                        <button style={s.editBtn} title="Edit UV" onClick={() => { setEditTab('part'); setUvPartId(selPart.id) }}>UV</button>
-                        <button style={s.editBtn} title="Edit texture" onClick={() => { setEditTab('part'); setUvPartId(selPart.id) }}>Tex</button>
+                        <button style={s.editBtn} title="Edit texture" onClick={() => { setUvPartId(selPart.id); setEditTab('texture') }}>Tex</button>
                         <button style={s.editBtn} title="Edit Model" onClick={() => setModelerMode({ partId: selPart.id, bodyId })}>3D</button>
                       </div>
                     )}
@@ -854,8 +850,7 @@ export default function Studio() {
                         <span style={extraSel.has(p.id) ? s.radioActive : s.radioInact}>{p.name}</span>
                       </div>
                       <div style={s.editBtns} onClick={e => e.stopPropagation()}>
-                        <button style={s.editBtn} title="Edit UV" onClick={() => { setEditTab('part'); setUvPartId(p.id) }}>UV</button>
-                        <button style={s.editBtn} title="Edit texture" onClick={() => { setEditTab('part'); setUvPartId(p.id) }}>Tex</button>
+                        <button style={s.editBtn} title="Edit texture" onClick={() => { setUvPartId(p.id); setEditTab('texture') }}>Tex</button>
                         <button style={s.editBtn} title="Edit Model" onClick={() => setModelerMode({ partId: p.id, bodyId })}>3D</button>
                       </div>
                     </div>
@@ -915,23 +910,30 @@ export default function Studio() {
         {/* ── Left divider ── */}
         <div style={s.divider} onMouseDown={e => { e.preventDefault(); dragRef2.current = { side:'left', startX: e.clientX, startW: leftWidth } }} />
 
-        {/* ── Center: 3D viewer + floating canvas panel ── */}
+        {editTab === 'modeler' ? (
+          <Modeler embedded
+            bodyId={bodyId}
+            partId={uvPartId || undefined}
+            onBack={() => setEditTab('texture')}
+          />
+        ) : <div style={{ display: 'contents' }}>
+
+        {/* ── Center: 3D viewer ── */}
         <div style={s.centerPanel}>
           {jem
             ? <CemViewer jem={jem} onError={()=>{}} showGrid={showGrid} showAxes={false} bgColor={bg} />
             : <div style={{ color:'var(--clr-text-dim)', padding:'2rem', fontSize:'0.9rem' }}>Select a body to preview.</div>}
-
         </div>
 
         {/* ── Right divider ── */}
         <div style={s.divider} onMouseDown={e => { e.preventDefault(); dragRef2.current = { side:'right', startX: e.clientX, startW: rightWidth } }} />
 
-        {/* ── Right panel — Body / Part tabs ── */}
+        {/* ── Right panel — Texture / Model Editor tabs ── */}
         <div style={{ ...s.rightPanelEdit, width: rightWidth }}>
 
           {/* Tab bar */}
           <div style={s.tabBar}>
-            {[['body','Body'],['part','Part']].map(([tab,label]) => (
+            {[['texture','Texture'],['modeler','Model Editor']].map(([tab,label]) => (
               <button key={tab}
                 style={{ ...s.tab, background: editTab===tab?'var(--clr-accent)':'var(--bg-panel-alt)', color: editTab===tab?'#fff':'var(--clr-text-dim)' }}
                 onClick={() => setEditTab(tab)}>{label}</button>
@@ -941,18 +943,12 @@ export default function Studio() {
           {/* Scrollable content under the active tab */}
           <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'0', background:'var(--bg-panel)', minHeight:0 }}>
 
-            {/* Part / model selector */}
+            {/* Target selector */}
             <div style={{ padding:'4px 6px', display:'flex', gap:'4px', alignItems:'center', borderBottom:'1px solid var(--bdr-dk)', flexShrink:0 }}>
-              {editTab === 'part' ? (
-                <select style={{ ...s.select, flex:1 }} value={uvPartId??''} onChange={e => { const id = Number(e.target.value); setUvPartId(id); setTexPartId(String(id)) }}>
-                  {activeParts.length === 0
-                    ? <option value="">— choose part in Compose —</option>
-                    : activeParts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)
-                  }
-                </select>
-              ) : (
-                <span style={{ ...s.label, flex:1, padding:'3px 6px' }}>{currentBody?.name ?? '—'}</span>
-              )}
+              <select style={{ ...s.select, flex:1 }} value={uvPartId??''} onChange={e => { const id = e.target.value ? Number(e.target.value) : null; setUvPartId(id); setTexPartId(id ? String(id) : '__body__') }}>
+                <option value="">Body: {currentBody?.name ?? '—'}</option>
+                {activeParts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
             </div>
 
             {/* ── TEXTURE PAINTER ── */}
@@ -1082,6 +1078,8 @@ export default function Studio() {
           </div>{/* scrollable content */}
 
         </div>{/* right panel */}
+
+        </div>}{/* end non-modeler */}
 
       </div>{/* content */}
 
