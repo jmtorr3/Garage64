@@ -147,7 +147,7 @@ function getFaceRects(box) {
 
 // ── Outliner ──────────────────────────────────────────────────────────────────
 
-function OutlinerNode({model, modelPath, sel, onSel, onDragStart, onDrop, depth=0}) {
+function OutlinerNode({model, modelPath, sel, onSel, onDragStart, onDrop, depth=0, hiddenModels, onToggleVisible}) {
   const [open,setOpen]=useState(false)
   const [dropOver, setDropOver]=useState(false)
   const indent=depth*14
@@ -164,6 +164,7 @@ function OutlinerNode({model, modelPath, sel, onSel, onDragStart, onDrop, depth=
     if (isAnc || isParent) setOpen(true)
   },[sel]) // eslint-disable-line react-hooks/exhaustive-deps
   const hasChildren=(model.boxes?.length||0)+(model.submodels?.length||0)>0
+  const isHidden = hiddenModels?.has(modelPath.join('_'))
   return (
     <div>
       <div draggable
@@ -181,7 +182,12 @@ function OutlinerNode({model, modelPath, sel, onSel, onDragStart, onDrop, depth=
           {hasChildren?(open?'▼':'▶'):' '}
         </span>
         <span style={{color:isSel?'#fff':'#88aaff'}}>⬡</span>
-        <span>{model.id||model.part||`bone ${modelPath[modelPath.length-1]}`}</span>
+        <span style={{flex:1,opacity:isHidden?0.4:1}}>{model.id||model.part||`bone ${modelPath[modelPath.length-1]}`}</span>
+        {onToggleVisible&&<span title={isHidden?'Show':'Hide'}
+          onClick={e=>{e.stopPropagation();onToggleVisible(modelPath)}}
+          style={{marginLeft:'auto',fontSize:'11px',opacity:isHidden?0.35:0.7,cursor:'pointer',paddingRight:'2px',flexShrink:0}}>
+          {isHidden?'○':'●'}
+        </span>}
       </div>
       {open&&<>
         {(model.boxes||[]).map((box,bi)=>{
@@ -194,7 +200,8 @@ function OutlinerNode({model, modelPath, sel, onSel, onDragStart, onDrop, depth=
         })}
         {(model.submodels||[]).map((sub,si)=>(
           <OutlinerNode key={si} model={sub} modelPath={[...modelPath,si]} sel={sel} onSel={onSel}
-            onDragStart={onDragStart} onDrop={onDrop} depth={depth+1}/>
+            onDragStart={onDragStart} onDrop={onDrop} depth={depth+1}
+            hiddenModels={hiddenModels} onToggleVisible={onToggleVisible}/>
         ))}
       </>}
     </div>
@@ -261,6 +268,8 @@ const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBo
   const [status,   setStatus]  = useState('')
   const [dataVer,  setDataVer] = useState(0) // bumped to force re-render from ref
   const [showGrid, setShowGrid] = useState(false)
+  const [hiddenModels, setHiddenModels] = useState(new Set())
+  const hiddenModelsRef = useRef(new Set())
 
   const dragItemRef = useRef(null)
 
@@ -277,6 +286,7 @@ const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBo
   useEffect(()=>{ tcModeRef.current=tcMode },[tcMode])
   useEffect(()=>{ if (ctxRef.current) ctxRef.current.scene.background=new THREE.Color(bg) },[bg])
   useEffect(()=>{ if (ctxRef.current?.grid) ctxRef.current.grid.visible=showGrid },[showGrid])
+  useEffect(()=>{ hiddenModelsRef.current=hiddenModels },[hiddenModels])
 
   // Three.js
   const mountRef        = useRef(null)
@@ -573,12 +583,35 @@ const [selFace,  setSelFace]  = useState(null)
     }
     ctx.scene.add(group); ctx.modelGroup=group
 
+    // Re-apply visibility for hidden models
+    hiddenModelsRef.current.forEach(key => {
+      group.traverse(obj => {
+        if (obj.userData.cemSel?.kind === 'model') {
+          const k = obj.userData.cemSel.modelPath.join('_')
+          if (k === key) obj.visible = false
+        }
+      })
+    })
+
     // Re-attach gizmo to current selection
     const cur=selRef.current
     if (cur) {
       const obj=findThreeObj(group,cur)
       if (obj) { ctx.tc.attach(obj); ctx.tc.setMode(cur.kind==='box'?'translate':(tcModeRef.current==='pivot'?'translate':tcModeRef.current)); attachHelper(obj) }
     }
+  }
+
+  function toggleModelVisible(modelPath) {
+    const key = modelPath.join('_')
+    setHiddenModels(prev => {
+      const next = new Set(prev)
+      const nowHidden = !next.has(key)
+      if (nowHidden) next.add(key); else next.delete(key)
+      hiddenModelsRef.current = next
+      const obj = findThreeObj(ctxRef.current?.modelGroup, { kind: 'model', modelPath })
+      if (obj) obj.visible = !nowHidden
+      return next
+    })
   }
 
   function attachHelper(obj) {
@@ -949,7 +982,7 @@ const [selFace,  setSelFace]  = useState(null)
           <div style={XP_TITLE}>Outliner</div>
           <div style={{flex:1,overflowY:'auto'}}>
             {(data?.models||[]).map((model,mi)=>(
-              <OutlinerNode key={mi} model={model} modelPath={[mi]} sel={sel} onSel={selectAndAttach} onDragStart={handleDragStart} onDrop={handleDrop} depth={0}/>
+              <OutlinerNode key={mi} model={model} modelPath={[mi]} sel={sel} onSel={selectAndAttach} onDragStart={handleDragStart} onDrop={handleDrop} depth={0} hiddenModels={hiddenModels} onToggleVisible={toggleModelVisible}/>
             ))}
           </div>
         </div>

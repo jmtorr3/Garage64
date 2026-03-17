@@ -146,6 +146,7 @@ export default function PartsLibrary() {
                         if (variant) params.set('variantId', String(variant.id))
                         if (body)    params.set('bodyId',    String(body.id))
                         params.set('presetPartId', String(p.id))
+                        params.set('newPart', '1')
                         navigate(`/studio?${params}`)
                       }}
                     >
