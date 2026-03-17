@@ -25,6 +25,7 @@ export const api = {
   createPart: (data) => req('/parts/', { method: 'POST', body: data }),
   updatePart: (id, data) => req(`/parts/${id}/`, { method: 'PUT', body: data }),
   deletePart: (id) => req(`/parts/${id}/`, { method: 'DELETE' }),
+  patchPart: (id, data) => req(`/parts/${id}/`, { method: 'PATCH', body: data }),
 
   // Bodies
   getBodies: () => req('/bodies/'),

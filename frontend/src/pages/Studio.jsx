@@ -324,6 +324,8 @@ export default function Studio() {
   const [variants,     setVariants]     = useState([])
   const [texVariantId, setTexVariantId] = useState('')
   const [texPath,      setTexPath]      = useState('')
+  const [showSaveAs,   setShowSaveAs]   = useState(false)
+  const [saveAsPath,   setSaveAsPath]   = useState('')
   const [zoom,         setZoom]         = useState(2)
   const [tool,         setTool]         = useState('pencil')
   const [color,        setColor]        = useState('#ff4455')
@@ -481,13 +483,31 @@ export default function Studio() {
     } else {
       const p = parts.find(x => String(x.id) === texTargetId)
       const raw = p?.attachment_meta?.textureFile || p?.attachment_meta?.texture || ''
-      if (raw) setTexPath(raw.replace(/^minecraft:/, ''))
+      if (raw) {
+        setTexPath(raw.replace(/^minecraft:/, ''))
+      } else if (bodyData?.texture) {
+        setTexPath(bodyData.texture.replace(/^minecraft:/, ''))
+      }
     }
   }, [texTargetId, parts, bodyData])
 
   useEffect(() => {
     bufRef.current = null; redraw()  // clear old texture immediately
-    if (!texPath) return
+    if (!texPath) {
+      // Part selected but has no texture yet — create blank canvas so painting works
+      if (texTargetId) {
+        const p = parts.find(x => String(x.id) === texTargetId)
+        const [tw, th] = p?.attachment_meta?.textureSize || [64, 32]
+        const buf = document.createElement('canvas')
+        buf.width = tw; buf.height = th
+        bufRef.current = buf
+        undoRef.current = []; redoRef.current = []
+        setUndoCount(0); setRedoCount(0)
+        setZoom(Math.max(1, Math.floor(340 / tw)))
+        redraw(); setTexStatus('New texture — use Save As to name it')
+      }
+      return
+    }
     const img = new Image()
     img.onload = () => {
       const buf = document.createElement('canvas')
@@ -552,12 +572,15 @@ export default function Studio() {
     if (tool === 'pencil') {
       const [r,g,b] = hexToRgba(color)
       ctx.clearRect(px,py,1,1); ctx.fillStyle = rgbaToSwatchCss(r,g,b,alpha); ctx.fillRect(px,py,1,1); redraw(); setTexDirty(true)
+      if (texPath) setTexturePatch({ path: texPath, canvas: buf })
     } else if (tool === 'fill') {
       const imgData = ctx.getImageData(0,0,buf.width,buf.height)
       const [r,g,b] = hexToRgba(color); floodFill(imgData,px,py,r,g,b,alpha)
       ctx.putImageData(imgData,0,0); redraw(); setTexDirty(true)
+      if (texPath) setTexturePatch({ path: texPath, canvas: buf })
     } else if (tool === 'eraser') {
       ctx.clearRect(px, py, 1, 1); redraw(); setTexDirty(true)
+      if (texPath) setTexturePatch({ path: texPath, canvas: buf })
     } else if (tool === 'eye') {
       const d = ctx.getImageData(px,py,1,1).data
       const hex = rgbaToHex(d[0],d[1],d[2])
@@ -588,6 +611,7 @@ export default function Studio() {
     redoRef.current.push(ctx.getImageData(0, 0, buf.width, buf.height))
     ctx.putImageData(prev, 0, 0)
     redraw(); setTexDirty(true)
+    if (texPath) setTexturePatch({ path: texPath, canvas: buf })
     setUndoCount(undoRef.current.length)
     setRedoCount(redoRef.current.length)
   }
@@ -600,6 +624,7 @@ export default function Studio() {
     undoRef.current.push(ctx.getImageData(0, 0, buf.width, buf.height))
     ctx.putImageData(next, 0, 0)
     redraw(); setTexDirty(true)
+    if (texPath) setTexturePatch({ path: texPath, canvas: buf })
     setUndoCount(undoRef.current.length)
     setRedoCount(redoRef.current.length)
   }
@@ -708,12 +733,35 @@ export default function Studio() {
 
   function texSaveAs() {
     if (!bufRef.current) { setTexStatus('No texture loaded.'); return }
-    const name = texPath ? texPath.split('/').pop() : 'texture.png'
-    bufRef.current.toBlob(blob => {
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url; a.download = name; a.click()
-      URL.revokeObjectURL(url)
+    // Suggest a path based on current context
+    let suggested = texPath
+    if (!suggested && composeSelItem?.kind === 'part' && currentBody) {
+      const p = parts.find(x => x.id === composeSelItem.partId)
+      suggested = `optifine/cem/${currentBody.name}/parts/${p?.name || 'texture'}.png`
+    }
+    setSaveAsPath(suggested || '')
+    setShowSaveAs(true)
+  }
+
+  async function doSaveAs() {
+    if (!bufRef.current || !saveAsPath) return
+    setShowSaveAs(false)
+    bufRef.current.toBlob(async blob => {
+      try {
+        await api.saveTexture(saveAsPath, blob)
+        // If a part is selected, update its attachment_meta.texture in the DB
+        if (composeSelItem?.kind === 'part') {
+          const p = parts.find(x => x.id === composeSelItem.partId)
+          if (p) {
+            const newMeta = { ...p.attachment_meta, texture: `minecraft:${saveAsPath}` }
+            await api.patchPart(p.id, { attachment_meta: newMeta })
+            setParts(ps => ps.map(x => x.id === p.id ? { ...x, attachment_meta: newMeta } : x))
+          }
+        }
+        setTexPath(saveAsPath)
+        setTexStatus('ok')
+        setTexDirty(false)
+      } catch (e) { setTexStatus(e.message) }
     }, 'image/png')
   }
 
@@ -963,10 +1011,23 @@ export default function Studio() {
           </div>
 
         </div>
-        <div style={{ padding: '8px', borderTop: '2px solid var(--bdr-dk)', display: 'flex', gap: '6px', flexWrap: 'wrap', flexShrink: 0 }}>
-          <button style={s.btn} onClick={texSave}>Save PNG</button>
-          <button style={{ ...s.btn, ...(texVariantId ? {} : { background: 'var(--bg-panel-alt)', color: 'var(--clr-text-dim)', cursor: 'not-allowed' }) }}
-            onClick={texSaveVariant} disabled={!texVariantId}>Save Override</button>
+        <div style={{ padding: '8px', borderTop: '2px solid var(--bdr-dk)', display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <button style={s.btn} onClick={texSave}>Save PNG</button>
+            <button style={s.btn} onClick={texSaveAs}>Save As</button>
+            <button style={{ ...s.btn, ...(texVariantId ? {} : { background: 'var(--bg-panel-alt)', color: 'var(--clr-text-dim)', cursor: 'not-allowed' }) }}
+              onClick={texSaveVariant} disabled={!texVariantId}>Save Override</button>
+          </div>
+          {showSaveAs && (
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+              <input style={{ ...s.inputFull, flex: 1, fontSize: '10px' }}
+                value={saveAsPath} onChange={e => setSaveAsPath(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') doSaveAs(); if (e.key === 'Escape') setShowSaveAs(false) }}
+                placeholder="optifine/cem/..." autoFocus />
+              <button style={s.btnSm} onClick={doSaveAs}>OK</button>
+              <button style={s.btnSm} onClick={() => setShowSaveAs(false)}>✕</button>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1320,6 +1381,16 @@ export default function Studio() {
                 {texStatus==='ok' && <span style={s.ok}>Saved!</span>}
                 {texStatus && texStatus!=='ok' && <span style={s.err}>{texStatus}</span>}
               </div>
+              {showSaveAs && (
+                <div style={{ display:'flex', gap:'4px', alignItems:'center', padding:'0 4px 8px' }}>
+                  <input style={{ ...s.inputFull, flex:1, fontSize:'10px' }}
+                    value={saveAsPath} onChange={e => setSaveAsPath(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') doSaveAs(); if (e.key === 'Escape') setShowSaveAs(false) }}
+                    placeholder="optifine/cem/..." autoFocus />
+                  <button style={s.btnSm} onClick={doSaveAs}>OK</button>
+                  <button style={s.btnSm} onClick={() => setShowSaveAs(false)}>✕</button>
+                </div>
+              )}
             </div>
 
           </div>
