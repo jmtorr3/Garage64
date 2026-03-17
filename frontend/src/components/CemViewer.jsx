@@ -19,27 +19,35 @@ const CemViewer = forwardRef(function CemViewer({
   showGrid = true, showAxes = true,
   fitScale = 1.0, enableZoom = true, bgColor = null,
   // 3D painting
-  enablePaint = false, onPaintUV = null, texturePatch = null,
+  enablePaint = false, onPaintUV = null, texturePatch = null, paintTexPath = null,
+  // restore camera from a prior session
+  initialCamera = null,
 }, ref) {
   const mountRef       = useRef(null)
   const ctxRef         = useRef(null)
   const sidebarOffsetRef = useRef(sidebarOffset)
   const fitScaleRef    = useRef(fitScale)
   const texMapRef      = useRef({})       // path → THREE.Texture
-  const enablePaintRef = useRef(enablePaint)
-  const onPaintUVRef   = useRef(onPaintUV)
+  const enablePaintRef  = useRef(enablePaint)
+  const onPaintUVRef    = useRef(onPaintUV)
+  const paintTexPathRef = useRef(paintTexPath)
   const paintingRef    = useRef(false)
-  const externalClickHandlerRef = useRef(null)
+  const externalClickHandlerRef    = useRef(null)
+  const externalDblClickHandlerRef = useRef(null)
   const rebuildVerRef  = useRef(0)
 
   const [rebuildTrigger, setRebuildTrigger] = useState(0)
 
-  useEffect(() => { sidebarOffsetRef.current = sidebarOffset }, [sidebarOffset])
-  useEffect(() => { enablePaintRef.current  = enablePaint  }, [enablePaint])
-  useEffect(() => { onPaintUVRef.current    = onPaintUV    }, [onPaintUV])
+  useEffect(() => { sidebarOffsetRef.current  = sidebarOffset }, [sidebarOffset])
+  useEffect(() => { enablePaintRef.current    = enablePaint  }, [enablePaint])
+  useEffect(() => { onPaintUVRef.current      = onPaintUV    }, [onPaintUV])
+  useEffect(() => { paintTexPathRef.current   = paintTexPath }, [paintTexPath])
+
+  const texturePatchRef = useRef(null)
 
   // ── Live texture patch — update material map without reloading model ──────
   useEffect(() => {
+    texturePatchRef.current = texturePatch
     if (!texturePatch) return
     const { path, canvas } = texturePatch
     const tex = texMapRef.current[path]
@@ -102,8 +110,16 @@ const CemViewer = forwardRef(function CemViewer({
         -((e.clientY - rect.top) / rect.height) * 2 + 1,
       ), camera)
       const hits = ray.intersectObjects([ctx.modelGroup], true)
+      const filterPath = paintTexPathRef.current
       for (const hit of hits) {
-        if (hit.uv) { onPaintUVRef.current(hit.uv.x, hit.uv.y, isFirst); return }
+        if (!hit.uv) continue
+        if (filterPath) {
+          const mats = Array.isArray(hit.object.material) ? hit.object.material : [hit.object.material]
+          const matchesTex = mats.some(m => m.map?.userData?.paintPath === filterPath)
+          if (!matchesTex) continue
+        }
+        onPaintUVRef.current(hit.uv.x, hit.uv.y, isFirst)
+        return
       }
     }
 
@@ -138,9 +154,11 @@ const CemViewer = forwardRef(function CemViewer({
       mouseDownPos = null
     }
     const el = renderer.domElement
-    el.addEventListener('mousedown', onDown)
-    el.addEventListener('mousemove', onMove)
-    el.addEventListener('mouseup',   onUp)
+    function onDblClick(e) { externalDblClickHandlerRef.current?.(e) }
+    el.addEventListener('mousedown',  onDown)
+    el.addEventListener('mousemove',  onMove)
+    el.addEventListener('mouseup',    onUp)
+    el.addEventListener('dblclick',   onDblClick)
     el.addEventListener('mouseleave', () => {
       if (paintingRef.current) {
         paintingRef.current = false
@@ -171,16 +189,25 @@ const CemViewer = forwardRef(function CemViewer({
     })
     ro.observe(mount)
 
-    ctxRef.current = { scene, camera, controls, renderer, grid, modelGroup: null, firstLoad: true }
+    const firstLoad = !initialCamera
+    if (initialCamera) {
+      const [px, py, pz] = initialCamera.position
+      const [tx, ty, tz] = initialCamera.target
+      camera.position.set(px, py, pz)
+      controls.target.set(tx, ty, tz)
+      controls.update()
+    }
+    ctxRef.current = { scene, camera, controls, renderer, grid, modelGroup: null, firstLoad }
 
     return () => {
       cancelAnimationFrame(animId)
       ro.disconnect()
       controls.dispose()
       renderer.dispose()
-      el.removeEventListener('mousedown', onDown)
-      el.removeEventListener('mousemove', onMove)
-      el.removeEventListener('mouseup',   onUp)
+      el.removeEventListener('mousedown',  onDown)
+      el.removeEventListener('mousemove',  onMove)
+      el.removeEventListener('mouseup',    onUp)
+      el.removeEventListener('dblclick',   onDblClick)
       el.removeEventListener('mouseleave', onUp)
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement)
       ctxRef.current = null
@@ -210,7 +237,7 @@ const CemViewer = forwardRef(function CemViewer({
         new Promise(resolve => {
           loader.load(
             `/api/asset/?path=${encodeURIComponent(normTexPath(raw))}`,
-            tex => resolve([raw, tex]),
+            tex => { tex.userData = { paintPath: normTexPath(raw) }; resolve([raw, tex]) },
             undefined,
             ()  => resolve([raw, null]),
           )
@@ -218,8 +245,18 @@ const CemViewer = forwardRef(function CemViewer({
       )
     ).then(entries => {
       if (cancelled || !ctxRef.current) return
-      const textureMap = Object.fromEntries(entries.filter(([, t]) => t !== null))
+      const textureMap = {}
+      for (const [raw, tex] of entries.filter(([, t]) => t !== null)) {
+        textureMap[raw] = tex                   // raw key for jemToScene lookups
+        textureMap[normTexPath(raw)] = tex      // normalized key for patch lookups
+      }
       texMapRef.current = textureMap          // save for paint patches
+      // Apply any pending texture patch (e.g. painted canvas from Block Editor)
+      const patch = texturePatchRef.current
+      if (patch && textureMap[patch.path]) {
+        textureMap[patch.path].image = patch.canvas
+        textureMap[patch.path].needsUpdate = true
+      }
       const modelGroup  = jemToScene(jem, textureMap)
 
       // Remove any model that may have been added by a concurrent load
@@ -262,6 +299,8 @@ const CemViewer = forwardRef(function CemViewer({
     getTexMap: () => texMapRef.current,
     setClickHandler: fn => { externalClickHandlerRef.current = fn },
     clearClickHandler: () => { externalClickHandlerRef.current = null },
+    setDblClickHandler: fn => { externalDblClickHandlerRef.current = fn },
+    clearDblClickHandler: () => { externalDblClickHandlerRef.current = null },
     triggerRebuild: () => { rebuildVerRef.current++; setRebuildTrigger(v => v + 1) },
   }), [])
 

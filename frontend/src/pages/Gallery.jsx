@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import CemViewer from '../components/CemViewer'
@@ -45,7 +45,8 @@ const s = {
 const EMPTY_FORM = { file_name: '', trigger_name: '', body: '', order: 1, part_ids: [] }
 
 export default function Gallery() {
-  const navigate = useNavigate()
+  const navigate  = useNavigate()
+  const viewerRef = useRef(null)
   const { isDark } = useTheme()
   const bg = isDark ? '#1e1e1e' : '#ece9d8'
   const [gTab,        setGTab]        = useState('cars')  // 'cars' | 'parts' | 'export'
@@ -240,7 +241,14 @@ export default function Gallery() {
                         </div>
                       )}
                       <div style={s.itemBtns} onClick={e => e.stopPropagation()}>
-                        <button style={s.btnSm} onClick={() => navigate(`/studio?variantId=${v.id}`)}>Edit</button>
+                        <button style={s.btnSm} onClick={() => {
+                          const ctx = viewerRef.current?.getCtx()
+                          if (ctx) sessionStorage.setItem('garage64_camera', JSON.stringify({
+                            position: ctx.camera.position.toArray(),
+                            target:   ctx.controls.target.toArray(),
+                          }))
+                          navigate(`/studio?variantId=${v.id}`)
+                        }}>Edit</button>
                         <button style={{ ...s.btnSm, ...s.btnDanger }} onClick={() => del(v.id)}>Delete</button>
                       </div>
                     </div>
@@ -267,7 +275,7 @@ export default function Gallery() {
               </div>
             )}
             <div style={{ ...s.viewerWrap, position: 'relative' }}>
-              <CemViewer jem={jem} onError={setViewError} autoRotate showGrid={false} showAxes={false} bgColor={bg} />
+              <CemViewer ref={viewerRef} jem={jem} onError={setViewError} autoRotate showGrid={false} showAxes={false} bgColor={bg} />
               {!jem && !loading && (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--clr-text-dim)', fontSize: '0.9rem', pointerEvents: 'none' }}>
                   Select a variant to preview

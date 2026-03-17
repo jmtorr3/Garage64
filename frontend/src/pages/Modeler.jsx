@@ -269,6 +269,10 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
   const origRef    = useRef(null)
   const selRef     = useRef(null)
   const tcModeRef  = useRef('translate')
+  const undoStackRef   = useRef([])
+  const redoStackRef   = useRef([])
+  const modelerUndoRef = useRef(null)
+  const modelerRedoRef = useRef(null)
   useEffect(()=>{ selRef.current=sel },[sel])
   useEffect(()=>{ tcModeRef.current=tcMode },[tcMode])
   useEffect(()=>{ if (ctxRef.current) ctxRef.current.scene.background=new THREE.Color(bg) },[bg])
@@ -328,7 +332,8 @@ const [selFace,  setSelFace]  = useState(null)
     if (!bodyId || editMode !== 'body') return
     api.getBody(bodyId).then(b=>{
       dataRef.current=b.body_data; origRef.current=b.body_data
-      if (ctxRef.current) ctxRef.current.firstLoad=true
+      undoStackRef.current=[]; redoStackRef.current=[]
+      if (ctxRef.current && !embedded) ctxRef.current.firstLoad=true
       setDataVer(v=>v+1); setDirty(false); setSel(null); setStatus('')
       loadTexAndRebuild(b.body_data)
     })
@@ -341,14 +346,17 @@ const [selFace,  setSelFace]  = useState(null)
       partObjRef.current = p
       const jem = partToJem(p)
       dataRef.current=jem; origRef.current=jem
-      if (ctxRef.current) ctxRef.current.firstLoad=true
+      undoStackRef.current=[]; redoStackRef.current=[]
+      if (ctxRef.current && !embedded) ctxRef.current.firstLoad=true
       setDataVer(v=>v+1); setDirty(false); setSel(null); setStatus('')
       loadTexAndRebuild(jem)
     })
   },[partId, editMode])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Sync texture patches from Studio into this viewer ─────────────────────
+  const texturePatchRef = useRef(null)
   useEffect(()=>{
+    texturePatchRef.current = texturePatch
     if (!texturePatch) return
     const { path, canvas } = texturePatch
     const tex = texMapRef.current[path]
@@ -377,10 +385,17 @@ const [selFace,  setSelFace]  = useState(null)
       tc,
       grid: extCtx.grid,
       modelGroup: null,
-      firstLoad: true,
+      firstLoad: false,
     }
 
     sharedViewerRef.current.setClickHandler(onViewportClick)
+    sharedViewerRef.current.setDblClickHandler(() => {
+      setTcMode(m => {
+        const next = m === 'translate' ? 'scale' : 'translate'
+        ctxRef.current?.tc?.setMode(next)
+        return next
+      })
+    })
 
     return () => {
       tc.detach()
@@ -403,6 +418,7 @@ const [selFace,  setSelFace]  = useState(null)
       }
       ctxRef.current = null
       sharedViewerRef.current?.clearClickHandler()
+      sharedViewerRef.current?.clearDblClickHandler()
       sharedViewerRef.current?.triggerRebuild()
     }
   }, [sharedViewerRef]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -492,12 +508,18 @@ const [selFace,  setSelFace]  = useState(null)
   // ── TC mode changes ────────────────────────────────────────────────────────
   useEffect(()=>{
     const tc=ctxRef.current?.tc; if (!tc) return
-    if (selRef.current?.kind==='model') tc.setMode(tcMode)
+    const internalMode = tcMode === 'pivot' ? 'translate' : tcMode
+    if (selRef.current?.kind==='model') tc.setMode(internalMode)
   },[tcMode])
 
   // ── Keyboard shortcuts ─────────────────────────────────────────────────────
   useEffect(()=>{
     function onKey(e){
+      if (e.ctrlKey||e.metaKey) {
+        if (!e.shiftKey && e.key==='z') { e.preventDefault(); modelerUndoRef.current?.() }
+        if (e.shiftKey && (e.key==='z'||e.key==='Z')) { e.preventDefault(); modelerRedoRef.current?.() }
+        return
+      }
       if (e.target.tagName==='INPUT') return
       if (e.key==='w'||e.key==='W') setTcMode('translate')
       if (e.key==='e'||e.key==='E') setTcMode('rotate')
@@ -520,6 +542,12 @@ const [selFace,  setSelFace]  = useState(null)
     ).then(entries=>{
       if (!ctxRef.current) return
       texMapRef.current=Object.fromEntries(entries.filter(([,t])=>t))
+      // Apply any pending texture patch (e.g. unsaved paint from Studio)
+      const patch = texturePatchRef.current
+      if (patch) {
+        const tex = texMapRef.current[patch.path]
+        if (tex) { tex.image = patch.canvas; tex.needsUpdate = true }
+      }
       rebuildScene()
     })
   }
@@ -532,14 +560,14 @@ const [selFace,  setSelFace]  = useState(null)
     if (ctx.modelGroup) { ctx.scene.remove(ctx.modelGroup); disposeGroup(ctx.modelGroup); ctx.modelGroup=null }
 
     const group=buildSceneRoot(data,texMapRef.current)
+    const box=new THREE.Box3().setFromObject(group)
+    const center=box.getCenter(new THREE.Vector3())
+    group.position.x -= center.x
+    group.position.z -= center.z
+    group.position.y -= box.min.y
+    const modelHeight=box.max.y-box.min.y
+    ctx.orbit.target.set(0, modelHeight/2, 0)
     if (ctx.firstLoad) {
-      const box=new THREE.Box3().setFromObject(group)
-      const center=box.getCenter(new THREE.Vector3())
-      group.position.x -= center.x
-      group.position.z -= center.z
-      group.position.y -= box.min.y
-      const modelHeight=box.max.y-box.min.y
-      ctx.orbit.target.set(0, modelHeight/2, 0)
       const size=box.getSize(new THREE.Vector3()).length()
       ctx.camera.position.set(size*.8,size*.6,size*1.2); ctx.orbit.update(); ctx.firstLoad=false
     }
@@ -549,7 +577,7 @@ const [selFace,  setSelFace]  = useState(null)
     const cur=selRef.current
     if (cur) {
       const obj=findThreeObj(group,cur)
-      if (obj) { ctx.tc.attach(obj); ctx.tc.setMode(cur.kind==='box'?'translate':tcModeRef.current); attachHelper(obj) }
+      if (obj) { ctx.tc.attach(obj); ctx.tc.setMode(cur.kind==='box'?'translate':(tcModeRef.current==='pivot'?'translate':tcModeRef.current)); attachHelper(obj) }
     }
   }
 
@@ -575,7 +603,24 @@ const [selFace,  setSelFace]  = useState(null)
     const r=v=>Math.round(v*1000)/1000
 
     let newModels
-    if (sel.kind==='model') {
+    if (sel.kind==='model' && tcModeRef.current==='pivot') {
+      // Move pivot only — shift translate, inversely offset boxes and submodels so geometry stays put
+      const oldT = model.translate || [0,0,0]
+      const newT = [r(obj.position.x*sx), r(obj.position.y*sy), r(obj.position.z*sz)]
+      const d = [newT[0]-oldT[0], newT[1]-oldT[1], newT[2]-oldT[2]]
+      newModels = updateNode(data.models, sel.modelPath, n => ({
+        ...n,
+        translate: newT,
+        boxes: (n.boxes||[]).map(box => {
+          const [bx=0,by=0,bz=0,...rest] = box.coordinates||[]
+          return {...box, coordinates:[r(bx-d[0]), r(by-d[1]), r(bz-d[2]), ...rest]}
+        }),
+        submodels: (n.submodels||[]).map(sub => {
+          const [stx=0,sty=0,stz=0] = sub.translate||[]
+          return {...sub, translate:[r(stx-d[0]), r(sty-d[1]), r(stz-d[2])]}
+        }),
+      }))
+    } else if (sel.kind==='model') {
       newModels=updateNode(data.models,sel.modelPath,n=>({...n,
         translate:[r(obj.position.x*sx), r(obj.position.y*sy), r(obj.position.z*sz)],
         rotate:   [r(obj.rotation.x/DEG*sx), r(obj.rotation.y/DEG*sy), r(obj.rotation.z/DEG*sz)],
@@ -593,6 +638,7 @@ const [selFace,  setSelFace]  = useState(null)
       })
     } else return
 
+    pushUndo()
     tcSyncRef.current=true
     dataRef.current={...data,models:newModels}
     setDataVer(v=>v+1); setDirty(true)
@@ -624,7 +670,8 @@ const [selFace,  setSelFace]  = useState(null)
     const obj=findThreeObj(ctx.modelGroup,newSel)
     if (obj) {
       ctx.tc.attach(obj)
-      ctx.tc.setMode(newSel.kind==='box'?'translate':tcModeRef.current)
+      const internalMode = tcModeRef.current === 'pivot' ? 'translate' : tcModeRef.current
+      ctx.tc.setMode(newSel.kind==='box'?'translate':internalMode)
       attachHelper(obj)
     }
   }
@@ -726,7 +773,34 @@ const [selFace,  setSelFace]  = useState(null)
 
   // ── Data mutations ─────────────────────────────────────────────────────────
 
+  function pushUndo() {
+    if (!dataRef.current) return
+    undoStackRef.current.push(JSON.stringify(dataRef.current))
+    if (undoStackRef.current.length > 100) undoStackRef.current.shift()
+    redoStackRef.current = []
+  }
+
+  function modelerUndo() {
+    if (!undoStackRef.current.length) return
+    redoStackRef.current.push(JSON.stringify(dataRef.current))
+    dataRef.current = JSON.parse(undoStackRef.current.pop())
+    setDataVer(v=>v+1); setDirty(true)
+    rebuildScene()
+  }
+
+  function modelerRedo() {
+    if (!redoStackRef.current.length) return
+    undoStackRef.current.push(JSON.stringify(dataRef.current))
+    dataRef.current = JSON.parse(redoStackRef.current.pop())
+    setDataVer(v=>v+1); setDirty(true)
+    rebuildScene()
+  }
+
+  modelerUndoRef.current = modelerUndo
+  modelerRedoRef.current = modelerRedo
+
   function bump(newModels) {
+    pushUndo()
     dataRef.current={...dataRef.current,models:newModels}
     setDataVer(v=>v+1); setDirty(true)
   }
@@ -827,7 +901,7 @@ const [selFace,  setSelFace]  = useState(null)
 
       {/* Toolbar */}
       <div style={s.topBar}>
-        {onBack && <><button style={s.btnSm} onClick={onBack}>← Simple Editor</button><div style={s.divider}/></>}
+        {onBack && <div style={s.divider}/>}
         {!embedded && <>
           <button style={editMode==='body'?s.btnAct:s.btnSm} onClick={()=>setEditMode('body')}>Body</button>
           <button style={editMode==='part'?s.btnAct:s.btnSm} onClick={()=>setEditMode('part')}>Part</button>
@@ -847,6 +921,7 @@ const [selFace,  setSelFace]  = useState(null)
         <div style={s.divider}/>
         <button style={tcMode==='translate'?s.btnAct:s.btnSm} onClick={()=>setTcMode('translate')} title="Move (W)">⤢ Move</button>
         <button style={tcMode==='rotate'   ?s.btnAct:s.btnSm} onClick={()=>setTcMode('rotate')}    title="Rotate (E)">↻ Rotate</button>
+        <button style={tcMode==='pivot'    ?s.btnAct:s.btnSm} onClick={()=>setTcMode('pivot')}     title="Move pivot (keeps geometry in place)">⊙ Pivot</button>
         <div style={s.divider}/>
         <button style={showGrid?s.btnAct:s.btnSm} onClick={()=>setShowGrid(v=>!v)}>⊞ Grid</button>
         <div style={s.divider}/>

@@ -161,6 +161,50 @@ def _write_properties(cem_dir: Path, body: EntityBody, variants: list):
     props_path.write_text(''.join(lines), encoding='utf-8')
 
 
+# ── Music file server ─────────────────────────────────────────────────────────
+
+AUDIO_EXTS = {'.mp3', '.flac', '.ogg', '.wav', '.m4a', '.aac', '.opus'}
+MUSIC_ROOT  = Path.home()
+
+@api_view(['GET'])
+def music_list(request):
+    """
+    GET /api/music/?dir=/some/path — list audio files in the given directory.
+    Falls back to ~/Music then ~/ if dir not supplied or invalid.
+    """
+    raw_dir = request.query_params.get('dir', '').strip()
+    if raw_dir:
+        root = Path(raw_dir).expanduser()
+    else:
+        root = Path.home() / 'Music'
+        if not root.is_dir():
+            root = MUSIC_ROOT
+
+    if not root.is_dir():
+        return Response({'error': f'Not a directory: {root}'}, status=400)
+
+    tracks = []
+    for p in sorted(root.rglob('*')):
+        if p.is_file() and p.suffix.lower() in AUDIO_EXTS:
+            tracks.append({'name': p.name, 'path': str(p)})
+    return Response(tracks)
+
+@api_view(['GET'])
+def music_stream(request):
+    """GET /api/music/stream/?path=<absolute-path> — stream an audio file."""
+    raw = request.query_params.get('path', '')
+    p = Path(raw).expanduser()
+    if not p.is_file() or p.suffix.lower() not in AUDIO_EXTS:
+        raise Http404
+    # Must stay inside the user's home directory
+    try:
+        p.relative_to(MUSIC_ROOT)
+    except ValueError:
+        raise Http404
+    mime, _ = mimetypes.guess_type(str(p))
+    return FileResponse(open(p, 'rb'), content_type=mime or 'audio/mpeg')
+
+
 # ── Pack asset file server ────────────────────────────────────────────────────
 
 @api_view(['GET', 'PUT'])
