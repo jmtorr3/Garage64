@@ -176,6 +176,9 @@ export default function Studio() {
   const [newSlot,    setNewSlot]    = useState({ name: '', display_name: '', order: '' })
   const [slotStatus, setSlotStatus] = useState('')
 
+  // ── Shared viewer ref (center CemViewer exposed to Modeler) ─────────────────
+  const viewerRef = useRef(null)
+
   // ── Panel resize ──────────────────────────────────────────────────────────────
   const [leftWidth,  setLeftWidth]  = useState(244)
   const [rightWidth, setRightWidth] = useState(320)
@@ -534,6 +537,17 @@ export default function Studio() {
     bufRef.current.toBlob(async blob => {
       try { await api.saveTexture(texPath, blob); setTexStatus('ok'); setTexDirty(false) }
       catch (e) { setTexStatus(e.message) }
+    }, 'image/png')
+  }
+
+  function texSaveAs() {
+    if (!bufRef.current) { setTexStatus('No texture loaded.'); return }
+    const name = texPath ? texPath.split('/').pop() : 'texture.png'
+    bufRef.current.toBlob(blob => {
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = name; a.click()
+      URL.revokeObjectURL(url)
     }, 'image/png')
   }
 
@@ -943,24 +957,28 @@ export default function Studio() {
         {/* ── Left divider ── */}
         <div style={s.divider} onMouseDown={e => { e.preventDefault(); dragRef2.current = { side:'left', startX: e.clientX, startW: leftWidth } }} />
 
-        {editTab === 'modeler' ? (
-          <Modeler embedded
-            key={composeSelItem ? JSON.stringify(composeSelItem) : `body_${bodyId}`}
-            bodyId={bodyId}
-            partId={composeSelItem?.kind==='part' ? composeSelItem.partId : undefined}
-            onBack={() => setEditTab('texture')}
-          />
-        ) : <div style={{ display: 'contents' }}>
-
-        {/* ── Center: 3D viewer ── */}
+        {/* ── Center: 3D viewer (always visible) ── */}
         <div style={{ ...s.centerPanel, position: 'relative' }}>
           {centerJem
-            ? <CemViewer jem={centerJem} onError={()=>{}} showGrid={showGrid} showAxes={false} bgColor={bg}
+            ? <CemViewer ref={viewerRef} jem={editTab === 'modeler' ? null : centerJem} onError={()=>{}} showGrid={showGrid} showAxes={false} bgColor={bg}
                 enablePaint={!!texPath && tool !== 'drag'} onPaintUV={onPaintUV} texturePatch={texturePatch} />
             : <div style={{ color:'var(--clr-text-dim)', padding:'2rem', fontSize:'0.9rem' }}>Select a body to preview.</div>}
-          <button
-            style={{ position:'absolute', bottom:'10px', left:'10px', ...s.btnSm, ...(showGrid ? { background:'var(--bg-btn-active)', borderTop:'1px solid var(--bdr-dk)', borderLeft:'1px solid var(--bdr-dk)', borderRight:'1px solid var(--bdr-input-lt)', borderBottom:'1px solid var(--bdr-input-lt)' } : {}) }}
-            onClick={() => setShowGrid(g => !g)}>⊞ Grid</button>
+          {/* Viewer toggle bar */}
+          <div style={{ position:'absolute', top:'10px', left:'10px', display:'flex', flexDirection:'column', gap:'4px', alignItems:'flex-start' }}>
+            {(bodyMiniJem || activeParts.length > 0) && (
+              <div style={{ display:'flex', gap:'3px', background:'rgba(0,0,0,0.65)', borderRadius:'4px', padding:'3px 6px', maxWidth:'90vw', overflowX:'auto' }}>
+                <button style={{ ...s.btnSm, whiteSpace:'nowrap', ...(composeSelItem?.kind==='body' ? { background:'var(--clr-accent)', color:'#fff' } : {}) }}
+                  onClick={() => setComposeSelItem({kind:'body'})}>Body</button>
+                {activeParts.map(p => (
+                  <button key={p.id} style={{ ...s.btnSm, whiteSpace:'nowrap', ...(composeSelItem?.kind==='part'&&composeSelItem.partId===p.id ? { background:'var(--clr-accent)', color:'#fff' } : {}) }}
+                    onClick={() => setComposeSelItem({kind:'part', partId:p.id})}>{p.name}</button>
+                ))}
+              </div>
+            )}
+            <button
+              style={{ ...s.btnSm, ...(showGrid ? { background:'var(--bg-btn-active)', borderTop:'1px solid var(--bdr-dk)', borderLeft:'1px solid var(--bdr-dk)', borderRight:'1px solid var(--bdr-input-lt)', borderBottom:'1px solid var(--bdr-input-lt)' } : {}) }}
+              onClick={() => setShowGrid(g => !g)}>⊞ Grid</button>
+          </div>
         </div>
 
         {/* ── Right divider ── */}
@@ -979,6 +997,12 @@ export default function Studio() {
           </div>
 
           {/* Scrollable content under the active tab */}
+          {editTab === 'modeler' ? (
+            <Modeler sharedViewerRef={viewerRef} embedded texturePatch={texturePatch}
+              bodyId={bodyId}
+              partId={composeSelItem?.kind === 'part' ? composeSelItem.partId : null}
+              onBack={() => setEditTab('texture')} />
+          ) : (
           <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'0', background:'var(--bg-panel)', minHeight:0 }}>
 
             {/* Target selector */}
@@ -1110,6 +1134,7 @@ export default function Studio() {
 
 <div style={{ display:'flex', gap:'6px', alignItems:'center', flexWrap:'wrap', padding:'0 4px 8px' }}>
                 <button style={s.btn} onClick={texSave}>Save PNG</button>
+                <button style={s.btn} onClick={texSaveAs}>Save As</button>
                 <button style={{ ...s.btn, ...(texVariantId ? {} : { background: 'var(--bg-panel-alt)', borderTopColor:'var(--bdr-lt)', borderLeftColor:'var(--bdr-lt)', borderRightColor:'var(--bdr-dk)', borderBottomColor:'var(--bdr-dk)', color:'var(--clr-text-dim)', cursor:'not-allowed' }) }}
                   onClick={texSaveVariant} disabled={!texVariantId} title="Save as per-variant texture override">
                   Save Override
@@ -1120,11 +1145,10 @@ export default function Studio() {
               </div>
             </div>
 
-          </div>{/* scrollable content */}
+          </div>
+          )}
 
         </div>{/* right panel */}
-
-        </div>}{/* end non-modeler */}
 
       </div>{/* content */}
 

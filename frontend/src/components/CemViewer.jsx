@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { jemToScene, collectTexturePaths, normTexPath } from '../cem'
@@ -13,14 +13,14 @@ function disposeGroup(group) {
   })
 }
 
-export default function CemViewer({
+const CemViewer = forwardRef(function CemViewer({
   jem, onError,
   autoRotate = false, sidebarOffset = 0,
   showGrid = true, showAxes = true,
   fitScale = 1.0, enableZoom = true, bgColor = null,
   // 3D painting
   enablePaint = false, onPaintUV = null, texturePatch = null,
-}) {
+}, ref) {
   const mountRef       = useRef(null)
   const ctxRef         = useRef(null)
   const sidebarOffsetRef = useRef(sidebarOffset)
@@ -29,6 +29,10 @@ export default function CemViewer({
   const enablePaintRef = useRef(enablePaint)
   const onPaintUVRef   = useRef(onPaintUV)
   const paintingRef    = useRef(false)
+  const externalClickHandlerRef = useRef(null)
+  const rebuildVerRef  = useRef(0)
+
+  const [rebuildTrigger, setRebuildTrigger] = useState(0)
 
   useEffect(() => { sidebarOffsetRef.current = sidebarOffset }, [sidebarOffset])
   useEffect(() => { enablePaintRef.current  = enablePaint  }, [enablePaint])
@@ -102,7 +106,12 @@ export default function CemViewer({
         if (hit.uv) { onPaintUVRef.current(hit.uv.x, hit.uv.y, isFirst); return }
       }
     }
+
+    // Track mousedown position for drag detection
+    let mouseDownPos = null
+
     function onDown(e) {
+      mouseDownPos = { x: e.clientX, y: e.clientY }
       if (e.button !== 0 || !enablePaintRef.current) return
       paintingRef.current = true
       controls.enabled = false
@@ -112,16 +121,33 @@ export default function CemViewer({
       if (!paintingRef.current || !enablePaintRef.current) return
       doPaint(e, false)
     }
-    function onUp() {
-      if (!paintingRef.current) return
-      paintingRef.current = false
-      controls.enabled = true
+    function onUp(e) {
+      const wasPainting = paintingRef.current
+      if (paintingRef.current) {
+        paintingRef.current = false
+        controls.enabled = true
+      }
+      // Fire external click handler if no drag (<4px) and not painting
+      if (mouseDownPos && !wasPainting && externalClickHandlerRef.current) {
+        const dx = Math.abs(e.clientX - mouseDownPos.x)
+        const dy = Math.abs(e.clientY - mouseDownPos.y)
+        if (dx < 4 && dy < 4) {
+          externalClickHandlerRef.current(e)
+        }
+      }
+      mouseDownPos = null
     }
     const el = renderer.domElement
     el.addEventListener('mousedown', onDown)
     el.addEventListener('mousemove', onMove)
     el.addEventListener('mouseup',   onUp)
-    el.addEventListener('mouseleave', onUp)
+    el.addEventListener('mouseleave', () => {
+      if (paintingRef.current) {
+        paintingRef.current = false
+        controls.enabled = true
+      }
+      mouseDownPos = null
+    })
 
     let animId
     function animate() {
@@ -163,7 +189,7 @@ export default function CemViewer({
 
   // ── Swap model whenever jem changes — camera stays put ────────────────────
   useEffect(() => {
-    if (!jem || !ctxRef.current) return
+    if (!ctxRef.current) return
     const ctx = ctxRef.current
     const { scene, camera, controls, grid } = ctx
 
@@ -173,6 +199,9 @@ export default function CemViewer({
       ctx.modelGroup = null
     }
 
+    if (!jem) return
+
+    let cancelled = false
     const loader   = new THREE.TextureLoader()
     const rawPaths = collectTexturePaths(jem)
 
@@ -188,10 +217,16 @@ export default function CemViewer({
         })
       )
     ).then(entries => {
-      if (!ctxRef.current) return
+      if (cancelled || !ctxRef.current) return
       const textureMap = Object.fromEntries(entries.filter(([, t]) => t !== null))
       texMapRef.current = textureMap          // save for paint patches
       const modelGroup  = jemToScene(jem, textureMap)
+
+      // Remove any model that may have been added by a concurrent load
+      if (ctx.modelGroup) {
+        scene.remove(ctx.modelGroup)
+        disposeGroup(ctx.modelGroup)
+      }
 
       const box    = new THREE.Box3().setFromObject(modelGroup)
       const center = box.getCenter(new THREE.Vector3())
@@ -217,7 +252,18 @@ export default function CemViewer({
       scene.add(modelGroup)
       ctx.modelGroup = modelGroup
     }).catch(e => onError?.(e.message))
-  }, [jem]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    return () => { cancelled = true }
+  }, [jem, rebuildTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Imperative handle ─────────────────────────────────────────────────────
+  useImperativeHandle(ref, () => ({
+    getCtx: () => ctxRef.current,
+    getTexMap: () => texMapRef.current,
+    setClickHandler: fn => { externalClickHandlerRef.current = fn },
+    clearClickHandler: () => { externalClickHandlerRef.current = null },
+    triggerRebuild: () => { rebuildVerRef.current++; setRebuildTrigger(v => v + 1) },
+  }), [])
 
   return (
     <div
@@ -225,4 +271,6 @@ export default function CemViewer({
       style={{ width: '100%', height: '100%', display: 'block', cursor: enablePaint ? 'crosshair' : 'grab' }}
     />
   )
-}
+})
+
+export default CemViewer

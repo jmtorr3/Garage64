@@ -245,7 +245,7 @@ function Vec3Input({label, value=[0,0,0], step=0.5, onChange}) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack, embedded = false } = {}) {
+export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack, embedded = false, sharedViewerRef = null, texturePatch = null } = {}) {
   const [searchParams] = useSearchParams()
   const { isDark } = useTheme()
   const bg = isDark ? '#1e1e1e' : '#ece9d8'
@@ -275,13 +275,12 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
   useEffect(()=>{ if (ctxRef.current?.grid) ctxRef.current.grid.visible=showGrid },[showGrid])
 
   // Three.js
-  const mountRef    = useRef(null)
-  const ctxRef      = useRef(null)
-  const texMapRef   = useRef({})
-  const helperRef   = useRef(null) // BoxHelper for selection
-  const tcSyncRef   = useRef(false)
-
-  const [selFace,  setSelFace]  = useState(null)
+  const mountRef        = useRef(null)
+  const ctxRef          = useRef(null)
+  const texMapRef       = useRef({})
+  const helperRef       = useRef(null) // BoxHelper for selection
+  const tcSyncRef       = useRef(false)
+const [selFace,  setSelFace]  = useState(null)
   const [showBody, setShowBody] = useState(false)
   const uvCanvasRef  = useRef(null)
   const uvBufRef     = useRef(null)
@@ -308,6 +307,22 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
     })
   },[])  // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── When embedded, sync editMode/partId/bodyId from parent props ───────────
+  useEffect(()=>{
+    if (!embedded) return
+    if (initPartId) {
+      setEditMode('part')
+      setPartId(initPartId)
+    } else {
+      setEditMode('body')
+    }
+  },[embedded, initPartId])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(()=>{
+    if (!embedded || !initBodyId) return
+    setBodyId(initBodyId)
+  },[embedded, initBodyId])  // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Load body data ──────────────────────────────────────────────────────────
   useEffect(()=>{
     if (!bodyId || editMode !== 'body') return
@@ -332,8 +347,69 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
     })
   },[partId, editMode])  // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Sync texture patches from Studio into this viewer ─────────────────────
+  useEffect(()=>{
+    if (!texturePatch) return
+    const { path, canvas } = texturePatch
+    const tex = texMapRef.current[path]
+    if (tex) { tex.image = canvas; tex.needsUpdate = true }
+  },[texturePatch])
+
+  // ── Shared viewer init (when sharedViewerRef is provided) ─────────────────
+  useEffect(()=>{
+    if (!sharedViewerRef) return
+    const extCtx = sharedViewerRef.current?.getCtx()
+    if (!extCtx) return
+
+    const tc = new TransformControls(extCtx.camera, extCtx.renderer.domElement)
+    tc.setMode('translate')
+    extCtx.scene.add(tc)
+
+    tc.addEventListener('dragging-changed', e => { extCtx.controls.enabled = !e.value })
+    tc.addEventListener('change', () => { if (helperRef.current) helperRef.current.update() })
+    tc.addEventListener('mouseUp', () => { syncTCToData(tc) })
+
+    ctxRef.current = {
+      scene: extCtx.scene,
+      camera: extCtx.camera,
+      renderer: extCtx.renderer,
+      orbit: extCtx.controls,
+      tc,
+      grid: extCtx.grid,
+      modelGroup: null,
+      firstLoad: true,
+    }
+
+    sharedViewerRef.current.setClickHandler(onViewportClick)
+
+    return () => {
+      tc.detach()
+      if (helperRef.current) {
+        extCtx.scene.remove(helperRef.current)
+        helperRef.current = null
+      }
+      extCtx.scene.remove(tc)
+      tc.dispose()
+      // Remove the model group the Modeler added to the shared scene
+      if (ctxRef.current?.modelGroup) {
+        extCtx.scene.remove(ctxRef.current.modelGroup)
+        disposeGroup(ctxRef.current.modelGroup)
+      }
+      // Remove body preview if present
+      if (bodyGroupRef.current) {
+        extCtx.scene.remove(bodyGroupRef.current)
+        disposeGroup(bodyGroupRef.current)
+        bodyGroupRef.current = null
+      }
+      ctxRef.current = null
+      sharedViewerRef.current?.clearClickHandler()
+      sharedViewerRef.current?.triggerRebuild()
+    }
+  }, [sharedViewerRef]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Three.js init ──────────────────────────────────────────────────────────
   useEffect(()=>{
+    if (sharedViewerRef) return
     const mount=mountRef.current; if (!mount) return
     const w=mount.clientWidth||800, h=mount.clientHeight||600
 
@@ -528,7 +604,7 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
   function onViewportClick(e) {
     const ctx=ctxRef.current; if (!ctx?.modelGroup) return
     if (ctx.tc.dragging) return
-    const rect=mountRef.current.getBoundingClientRect()
+    const rect=(sharedViewerRef ? ctx.renderer.domElement : mountRef.current).getBoundingClientRect()
     const ray=new THREE.Raycaster()
     ray.setFromCamera(new THREE.Vector2(
       ((e.clientX-rect.left)/rect.width)*2-1,
@@ -752,19 +828,21 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
       {/* Toolbar */}
       <div style={s.topBar}>
         {onBack && <><button style={s.btnSm} onClick={onBack}>← Simple Editor</button><div style={s.divider}/></>}
-        <button style={editMode==='body'?s.btnAct:s.btnSm} onClick={()=>setEditMode('body')}>Body</button>
-        <button style={editMode==='part'?s.btnAct:s.btnSm} onClick={()=>setEditMode('part')}>Part</button>
-        {editMode==='body'
-          ? <select style={{...s.select,width:'auto'}} value={bodyId??''} onChange={e=>setBodyId(Number(e.target.value))}>
-              {bodies.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          : <select style={{...s.select,width:'auto'}} value={partId??''} onChange={e=>setPartId(Number(e.target.value))}>
-              {parts.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-        }
-        {editMode==='part'&&bodyId&&<>
-          <div style={s.divider}/>
-          <button style={showBody?s.btnAct:s.btnSm} onClick={()=>setShowBody(v=>!v)} title="Toggle body preview">◉ Body</button>
+        {!embedded && <>
+          <button style={editMode==='body'?s.btnAct:s.btnSm} onClick={()=>setEditMode('body')}>Body</button>
+          <button style={editMode==='part'?s.btnAct:s.btnSm} onClick={()=>setEditMode('part')}>Part</button>
+          {editMode==='body'
+            ? <select style={{...s.select,width:'auto'}} value={bodyId??''} onChange={e=>setBodyId(Number(e.target.value))}>
+                {bodies.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            : <select style={{...s.select,width:'auto'}} value={partId??''} onChange={e=>setPartId(Number(e.target.value))}>
+                {parts.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+          }
+          {editMode==='part'&&bodyId&&<>
+            <div style={s.divider}/>
+            <button style={showBody?s.btnAct:s.btnSm} onClick={()=>setShowBody(v=>!v)} title="Toggle body preview">◉ Body</button>
+          </>}
         </>}
         <div style={s.divider}/>
         <button style={tcMode==='translate'?s.btnAct:s.btnSm} onClick={()=>setTcMode('translate')} title="Move (W)">⤢ Move</button>
@@ -794,8 +872,8 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
           </div>
         </div>
 
-        {/* Center — 3D Viewport */}
-        <div ref={mountRef} style={s.viewport} onClick={onViewportClick}/>
+        {/* Center — 3D Viewport (hidden in shared mode; CemViewer is the canvas) */}
+        {!sharedViewerRef && <div ref={mountRef} style={s.viewport} onClick={onViewportClick}/>}
 
         {/* Right — Properties */}
         <div style={s.rPanel}>
