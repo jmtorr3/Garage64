@@ -11,6 +11,7 @@ import { OrbitControls }     from 'three/examples/jsm/controls/OrbitControls.js'
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
 import { api } from '../api'
 import { collectTexturePaths, normTexPath, jemToScene } from '../cem'
+import CemViewer from '../components/CemViewer'
 
 const DEG = Math.PI / 180
 
@@ -26,14 +27,14 @@ const s = {
   content:   { flex:1, display:'flex', overflow:'hidden' },
   outliner:  { width:240, flexShrink:0, display:'flex', flexDirection:'column', overflow:'hidden', background:'var(--bg-panel)', borderRight:'2px solid var(--bdr-dk)' },
   viewport:  { flex:1, position:'relative', overflow:'hidden' },
-  rPanel:    { width:270, flexShrink:0, display:'flex', flexDirection:'column', overflow:'hidden', background:'var(--bg-panel)', borderLeft:'2px solid var(--bdr-dk)' },
+  rPanel:    { flexShrink:0, position:'relative', display:'flex', flexDirection:'column', overflow:'hidden', background:'var(--bg-panel)', borderLeft:'2px solid var(--bdr-dk)' },
   label:     { color:'var(--clr-text-dim)', fontSize:'11px', fontFamily:'Monocraft, sans-serif' },
   btnSm:     XP_BTN_SM,
   btnAct:    { ...XP_BTN_SM, background:'var(--bg-btn-active)', borderTop:'1px solid var(--bdr-dk)', borderLeft:'1px solid var(--bdr-dk)', borderRight:'1px solid var(--bdr-input-lt)', borderBottom:'1px solid var(--bdr-input-lt)' },
   btn:       { padding:'4px 16px', background:'var(--bg-btn-primary)', borderTop:'2px solid var(--bdr-btn-primary-lt)', borderLeft:'2px solid var(--bdr-btn-primary-lt)', borderRight:'2px solid var(--bdr-btn-primary-dk)', borderBottom:'2px solid var(--bdr-btn-primary-dk)', color:'#fff', fontFamily:'Monocraft, sans-serif', fontSize:'11px', fontWeight:'bold', cursor:'pointer' },
   divider:   { width:1, height:22, background:'var(--bdr-dk)', margin:'0 2px', flexShrink:0 },
   select:    { ...XP_INPUT },
-  numInput:  { ...XP_INPUT, width:'56px' },
+  numInput:  { ...XP_INPUT, flex:1, minWidth:'40px' },
   propLabel: { color:'var(--clr-text-dim)', fontSize:'10px', fontFamily:'Monocraft, sans-serif', width:'14px', textAlign:'right', flexShrink:0 },
   ok:        { color:'var(--clr-ok)', fontSize:'11px', fontFamily:'Monocraft, sans-serif' },
   err:       { color:'var(--clr-err)', fontSize:'11px', fontFamily:'Monocraft, sans-serif' },
@@ -145,11 +146,49 @@ function getFaceRects(box) {
   return { north:box.uvNorth, south:box.uvSouth, east:box.uvEast, west:box.uvWest, up:box.uvUp, down:box.uvDown }
 }
 
+// ── Model move helpers ────────────────────────────────────────────────────────
+
+// Remove node at modelPath, return [newModels, removedNode]
+function extractModel(models, path) {
+  const m = JSON.parse(JSON.stringify(models))
+  const idx = path[path.length - 1]
+  if (path.length === 1) { const [n] = m.splice(idx, 1); return [m, n] }
+  let parent = m[path[0]]
+  for (let i = 1; i < path.length - 1; i++) parent = parent.submodels[path[i]]
+  const [n] = parent.submodels.splice(idx, 1)
+  return [m, n]
+}
+
+// Insert node as last submodel of the node at targetPath (or at top level if targetPath=[])
+function nestModel(models, targetPath, node) {
+  const m = JSON.parse(JSON.stringify(models))
+  if (targetPath.length === 0) { m.push(node); return m }
+  let t = m[targetPath[0]]
+  for (let i = 1; i < targetPath.length; i++) t = t.submodels[targetPath[i]]
+  if (!t.submodels) t.submodels = []
+  t.submodels.push(node)
+  return m
+}
+
+// After removing src at srcPath, the targetPath may shift at the divergence level
+function adjustPath(srcPath, tgtPath) {
+  const adj = [...tgtPath]
+  // Find first level where they share the same parent chain
+  let shared = 0
+  while (shared < srcPath.length - 1 && shared < tgtPath.length && srcPath[shared] === tgtPath[shared]) shared++
+  // At level `shared`, src's removal may shift tgt's index
+  if (shared === srcPath.length - 1 && shared < tgtPath.length && srcPath[shared] < tgtPath[shared]) {
+    adj[shared]--
+  }
+  return adj
+}
+
 // ── Outliner ──────────────────────────────────────────────────────────────────
 
 function OutlinerNode({model, modelPath, sel, onSel, onDragStart, onDrop, depth=0, hiddenModels, onToggleVisible}) {
   const [open,setOpen]=useState(false)
   const [dropOver, setDropOver]=useState(false)
+  const hoverTimer = useRef(null)
   const indent=depth*14
   const isSel=sel?.kind==='model'&&selKey(sel)===selKey({kind:'model',modelPath})
 
@@ -157,21 +196,29 @@ function OutlinerNode({model, modelPath, sel, onSel, onDragStart, onDrop, depth=
   useEffect(()=>{
     if (!sel?.modelPath) return
     const sp=sel.modelPath
-    // This node is an ancestor of the selected path
     const isAnc = sp.length > modelPath.length && modelPath.every((v,i)=>sp[i]===v)
-    // A box inside this exact model is selected
     const isParent = sel.kind==='box' && sp.length===modelPath.length && modelPath.every((v,i)=>sp[i]===v)
     if (isAnc || isParent) setOpen(true)
   },[sel]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function onDragOverNode(e) {
+    e.preventDefault(); e.stopPropagation(); setDropOver(true)
+    if (!hoverTimer.current) hoverTimer.current = setTimeout(() => setOpen(true), 600)
+  }
+  function onDragLeaveNode() {
+    setDropOver(false)
+    clearTimeout(hoverTimer.current); hoverTimer.current = null
+  }
+
   const hasChildren=(model.boxes?.length||0)+(model.submodels?.length||0)>0
   const isHidden = hiddenModels?.has(modelPath.join('_'))
   return (
     <div>
       <div draggable
         onDragStart={e=>{e.stopPropagation();onDragStart({kind:'model',modelPath})}}
-        onDragOver={e=>{e.preventDefault();e.stopPropagation();setDropOver(true)}}
-        onDragLeave={()=>setDropOver(false)}
-        onDrop={e=>{e.stopPropagation();setDropOver(false);onDrop({kind:'model',modelPath})}}
+        onDragOver={onDragOverNode}
+        onDragLeave={onDragLeaveNode}
+        onDrop={e=>{e.stopPropagation();setDropOver(false);clearTimeout(hoverTimer.current);hoverTimer.current=null;onDrop({kind:'model',modelPath})}}
         style={{...s.treeRow, paddingLeft:4+indent,
           background:isSel?'var(--clr-accent)':dropOver?'rgba(100,160,255,0.18)':'transparent',
           color:isSel?'#fff':'var(--clr-text)',
@@ -181,7 +228,7 @@ function OutlinerNode({model, modelPath, sel, onSel, onDragStart, onDrop, depth=
           onClick={e=>{e.stopPropagation();setOpen(v=>!v)}}>
           {hasChildren?(open?'▼':'▶'):' '}
         </span>
-        <span style={{color:isSel?'#fff':'#88aaff'}}>⬡</span>
+        <span style={{color:isSel?'#fff':'#88aaff'}}>{(model.submodels?.length && !model.boxes?.length) ? '📁' : '⬡'}</span>
         <span style={{flex:1,opacity:isHidden?0.4:1}}>{model.id||model.part||`bone ${modelPath[modelPath.length-1]}`}</span>
         {onToggleVisible&&<span title={isHidden?'Show':'Hide'}
           onClick={e=>{e.stopPropagation();onToggleVisible(modelPath)}}
@@ -204,6 +251,23 @@ function OutlinerNode({model, modelPath, sel, onSel, onDragStart, onDrop, depth=
             hiddenModels={hiddenModels} onToggleVisible={onToggleVisible}/>
         ))}
       </>}
+    </div>
+  )
+}
+
+function RootDropZone({onDrop}) {
+  const [over, setOver] = useState(false)
+  return (
+    <div
+      onDragOver={e=>{e.preventDefault();setOver(true)}}
+      onDragLeave={()=>setOver(false)}
+      onDrop={e=>{e.stopPropagation();setOver(false);onDrop()}}
+      style={{minHeight:24,borderTop:'1px dashed rgba(255,255,255,0.08)',margin:'2px 4px',borderRadius:2,
+        background:over?'rgba(100,160,255,0.12)':'transparent',
+        display:'flex',alignItems:'center',justifyContent:'center',
+        fontSize:'9px',color:over?'#88aaff':'rgba(255,255,255,0.2)',fontFamily:'Monocraft,sans-serif',
+        transition:'background 0.1s'}}>
+      {over ? '↑ move to root' : ''}
     </div>
   )
 }
@@ -236,11 +300,11 @@ function Vec3Input({label, value=[0,0,0], step=0.5, onChange}) {
   return (
     <div style={{marginBottom:8}}>
       <div style={{...s.label,marginBottom:2}}>{label}</div>
-      <div style={{display:'flex',gap:3}}>
+      <div style={{display:'flex',gap:3,width:'100%'}}>
         {['X','Y','Z'].map((ax,i)=>(
-          <div key={ax} style={{display:'flex',alignItems:'center',gap:2}}>
+          <div key={ax} style={{display:'flex',alignItems:'center',gap:2,flex:1,minWidth:0}}>
             <span style={s.propLabel}>{ax}</span>
-            <input type="number" step={step} style={s.numInput}
+            <input type="number" step={step} style={{...s.numInput,width:0}}
               value={Math.round((value[i]??0)*1000)/1000}
               onChange={e=>{const n=[...value];n[i]=Number(e.target.value);onChange(n)}}/>
           </div>
@@ -269,7 +333,10 @@ const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBo
   const [dataVer,  setDataVer] = useState(0) // bumped to force re-render from ref
   const [showGrid, setShowGrid] = useState(false)
   const [hiddenModels, setHiddenModels] = useState(new Set())
+  const [saveAsName,   setSaveAsName]   = useState('')
+  const [rPanelWidth,  setRPanelWidth]  = useState(270)
   const hiddenModelsRef = useRef(new Set())
+  const rPanelDragRef   = useRef(null)
 
   const dragItemRef = useRef(null)
 
@@ -881,13 +948,26 @@ const [selFace,  setSelFace]  = useState(null)
     try {
       if (editMode === 'part' && partId && partObjRef.current) {
         const p = partObjRef.current
-        // part_data is wrapped as a submodel of the outer attachment entry; unwrap it
         const partData = dataRef.current.models[0]?.submodels?.[0] ?? dataRef.current.models[0]
         await api.updatePart(partId, { ...p, part_data: partData })
       } else {
         await api.patchBody(bodyId, {body_data: dataRef.current})
       }
       origRef.current=dataRef.current; setDirty(false); setStatus('ok')
+    } catch(e) { setStatus(e.message) }
+  }
+
+  async function saveAs(newName) {
+    if (!partObjRef.current || !newName?.trim()) { setStatus('Enter a name'); return }
+    setStatus('')
+    try {
+      const p = partObjRef.current
+      const partData = dataRef.current.models[0]?.submodels?.[0] ?? dataRef.current.models[0]
+      // Derive new jpm_path by replacing the filename portion
+      const newPath = p.jpm_path.replace(/[^/]+\.jpm$/, `${newName.trim()}.jpm`)
+      const created = await api.createPart({ ...p, id: undefined, name: newName.trim(), jpm_path: newPath, part_data: partData })
+      partObjRef.current = created
+      origRef.current = dataRef.current; setDirty(false); setStatus('ok'); return true
     } catch(e) { setStatus(e.message) }
   }
 
@@ -902,7 +982,20 @@ const [selFace,  setSelFace]  = useState(null)
     deleteSelected,
     undo: modelerUndo,
     redo: modelerRedo,
+    save,
+    saveAs,
   }), []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function startRPanelResize(e) {
+    if (e.button !== 0) return
+    e.preventDefault()
+    rPanelDragRef.current = e.clientX
+    const startW = rPanelWidth
+    const onMove = ev => setRPanelWidth(Math.max(200, Math.min(520, startW + (rPanelDragRef.current - ev.clientX))))
+    const onUp   = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
 
   function revert() {
     dataRef.current=origRef.current
@@ -932,16 +1025,63 @@ const [selFace,  setSelFace]  = useState(null)
       return
     }
 
-    // Reorder top-level bones
-    if (src.kind==='model' && target.kind==='model' &&
-        src.modelPath.length===1 && target.modelPath.length===1 &&
-        src.modelPath[0] !== target.modelPath[0]) {
-      const models = [...data.models]
-      const [moved] = models.splice(src.modelPath[0], 1)
-      models.splice(target.modelPath[0], 0, moved)
-      dataRef.current = {...data, models}
+    if (src.kind==='model' && target.kind==='model') {
+      const sp = src.modelPath, tp = target.modelPath
+      if (JSON.stringify(sp) === JSON.stringify(tp)) return
+      // Can't nest into own descendant
+      if (tp.length > sp.length && sp.every((v,i) => tp[i]===v)) return
+
+      const spParent = JSON.stringify(sp.slice(0,-1))
+      const tpParent = JSON.stringify(tp.slice(0,-1))
+
+      pushUndo()
+      if (spParent === tpParent) {
+        // Same parent → reorder within that parent
+        const parentPath = sp.slice(0,-1)
+        const srcIdx = sp[sp.length-1], tgtIdx = tp[tp.length-1]
+        if (parentPath.length === 0) {
+          const models = [...data.models]
+          const [moved] = models.splice(srcIdx, 1)
+          models.splice(tgtIdx, 0, moved)
+          dataRef.current = {...data, models}
+        } else {
+          dataRef.current = {...data, models: updateNode(data.models, parentPath, n => {
+            const subs = [...(n.submodels||[])]
+            const [moved] = subs.splice(srcIdx, 1)
+            subs.splice(tgtIdx, 0, moved)
+            return {...n, submodels: subs}
+          })}
+        }
+      } else {
+        // Different parent → nest src into target
+        const [m1, node] = extractModel(data.models, sp)
+        const adjTp = adjustPath(sp, tp)
+        dataRef.current = {...data, models: nestModel(m1, adjTp, node)}
+      }
       setDataVer(v=>v+1); setDirty(true)
     }
+  }
+
+  function handleDropRoot() {
+    const src = dragItemRef.current
+    dragItemRef.current = null
+    if (!src || src.kind !== 'model' || !dataRef.current) return
+    const data = dataRef.current
+    if (src.modelPath.length === 1) return // already at root
+    pushUndo()
+    const [newModels, node] = extractModel(data.models, src.modelPath)
+    dataRef.current = {...data, models: [...newModels, node]}
+    setDataVer(v=>v+1); setDirty(true)
+  }
+
+  function addFolder() {
+    if (!dataRef.current) return
+    pushUndo()
+    const existing = (dataRef.current.models||[]).filter(m => (m.id||'').startsWith('folder'))
+    const name = `folder_${existing.length + 1}`
+    const newFolder = { id: name, boxes: [], submodels: [] }
+    dataRef.current = {...dataRef.current, models: [...(dataRef.current.models||[]), newFolder]}
+    setDataVer(v=>v+1); setDirty(true)
   }
 
   // ── Derived for render ─────────────────────────────────────────────────────
@@ -993,11 +1133,19 @@ const [selFace,  setSelFace]  = useState(null)
 
         {/* Left — Outliner */}
         <div style={s.outliner}>
-          <div style={XP_TITLE}>Outliner</div>
-          <div style={{flex:1,overflowY:'auto'}}>
-            {(data?.models||[]).map((model,mi)=>(
-              <OutlinerNode key={mi} model={model} modelPath={[mi]} sel={sel} onSel={selectAndAttach} onDragStart={handleDragStart} onDrop={handleDrop} depth={0} hiddenModels={hiddenModels} onToggleVisible={toggleModelVisible}/>
-            ))}
+          <div style={{...XP_TITLE, display:'flex', alignItems:'center'}}>
+            <span style={{flex:1}}>Outliner</span>
+            <button title="Add Folder" onClick={addFolder}
+              style={{background:'none',border:'none',color:'var(--clr-text)',cursor:'pointer',fontSize:'13px',padding:'0 4px',lineHeight:1}}>📁+</button>
+          </div>
+          <div style={{flex:1,overflowY:'auto',display:'flex',flexDirection:'column'}}>
+            <div style={{flex:1}}>
+              {(data?.models||[]).map((model,mi)=>(
+                <OutlinerNode key={mi} model={model} modelPath={[mi]} sel={sel} onSel={selectAndAttach} onDragStart={handleDragStart} onDrop={handleDrop} depth={0} hiddenModels={hiddenModels} onToggleVisible={toggleModelVisible}/>
+              ))}
+            </div>
+            {/* Root drop zone — drag here to move a model back to top level */}
+            <RootDropZone onDrop={handleDropRoot}/>
           </div>
         </div>
 
@@ -1005,7 +1153,9 @@ const [selFace,  setSelFace]  = useState(null)
         {!sharedViewerRef && <div ref={mountRef} style={s.viewport} onClick={onViewportClick}/>}
 
         {/* Right — Properties */}
-        <div style={s.rPanel}>
+        <div style={{...s.rPanel, width:rPanelWidth}}>
+          {/* Resize handle */}
+          <div onMouseDown={startRPanelResize} style={{position:'absolute',left:0,top:0,bottom:0,width:4,cursor:'col-resize',zIndex:10,background:'transparent'}} />
           <div style={XP_TITLE}>Properties</div>
           <div style={{flex:1,overflowY:'auto',padding:'8px',minHeight:0}}>
 
@@ -1105,10 +1255,31 @@ const [selFace,  setSelFace]  = useState(null)
               </>
             )}
           </div>
-          {/* UV canvas */}
-          <div style={{flexShrink:0,borderTop:'2px solid var(--bdr-dk)',background:'#111',overflow:'auto',maxHeight:180}}>
-            <canvas ref={uvCanvasRef} style={{display:'block',imageRendering:'pixelated'}}/>
+          {/* Model preview */}
+          <div style={{flexShrink:0,borderTop:'2px solid var(--bdr-dk)',height:180}}>
+            <CemViewer key={dataVer} jem={dataRef.current} texturePatch={texturePatch} showGrid={false} showAxes={false} autoRotate />
           </div>
+
+          {/* Save section — only when embedded in Studio */}
+          {embedded && (
+            <div style={{flexShrink:0,borderTop:'2px solid var(--bdr-dk)',padding:'8px',display:'flex',flexDirection:'column',gap:'6px'}}>
+              <div style={XP_TITLE}>Save</div>
+              <div style={{display:'flex',alignItems:'center',gap:'6px',paddingTop:'4px'}}>
+                <button style={s.btn} onClick={save}>Update Part</button>
+                {status==='ok'&&<span style={s.ok}>Saved!</span>}
+                {status&&status!=='ok'&&<span style={s.err}>{status}</span>}
+              </div>
+              <div style={{display:'flex',gap:'4px',alignItems:'center'}}>
+                <input
+                  style={{...XP_INPUT,flex:1,minWidth:0}}
+                  placeholder="new part name…"
+                  value={saveAsName}
+                  onChange={e=>setSaveAsName(e.target.value)}
+                />
+                <button style={s.btnSm} onClick={async ()=>{ const ok=await saveAs(saveAsName); if(ok) setSaveAsName('') }}>Save As</button>
+              </div>
+            </div>
+          )}
         </div>
 
       </div>
