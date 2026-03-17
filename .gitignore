@@ -13,6 +13,7 @@ __pycache__/
 *$py.class
 .env
 .pytest_cache/
+db.sqlite3
 
 # --- Frontend (Node/Vite) ---
 node_modules/
