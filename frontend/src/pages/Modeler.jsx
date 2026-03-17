@@ -252,7 +252,7 @@ function Vec3Input({label, value=[0,0,0], step=0.5, onChange}) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBodyId, onBack, embedded = false, sharedViewerRef = null, texturePatch = null } = {}, ref) {
+const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBodyId, onBack, embedded = false, sharedViewerRef = null, texturePatch = null, showBodyPreview = null, previewParts = null, onBarUpdate = null, showGridProp = null } = {}, ref) {
   const [searchParams] = useSearchParams()
   const { isDark } = useTheme()
   const bg = isDark ? '#1e1e1e' : '#ece9d8'
@@ -286,7 +286,11 @@ const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBo
   useEffect(()=>{ tcModeRef.current=tcMode },[tcMode])
   useEffect(()=>{ if (ctxRef.current) ctxRef.current.scene.background=new THREE.Color(bg) },[bg])
   useEffect(()=>{ if (ctxRef.current?.grid) ctxRef.current.grid.visible=showGrid },[showGrid])
+  useEffect(()=>{ if (showGridProp !== null) setShowGrid(showGridProp) },[showGridProp])
   useEffect(()=>{ hiddenModelsRef.current=hiddenModels },[hiddenModels])
+  useEffect(()=>{
+    onBarUpdate?.({ tcMode, showGrid, hasSel: !!sel, undoCount: undoStackRef.current.length, redoCount: redoStackRef.current.length })
+  },[tcMode, showGrid, sel]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Three.js
   const mountRef        = useRef(null)
@@ -813,12 +817,16 @@ const [selFace,  setSelFace]  = useState(null)
     redoStackRef.current = []
   }
 
+  function notifyBar() {
+    onBarUpdate?.({ tcMode: tcModeRef.current, showGrid: ctxRef.current?.grid?.visible ?? false, hasSel: !!selRef.current, undoCount: undoStackRef.current.length, redoCount: redoStackRef.current.length })
+  }
+
   function modelerUndo() {
     if (!undoStackRef.current.length) return
     redoStackRef.current.push(JSON.stringify(dataRef.current))
     dataRef.current = JSON.parse(undoStackRef.current.pop())
     setDataVer(v=>v+1); setDirty(true)
-    rebuildScene()
+    rebuildScene(); notifyBar()
   }
 
   function modelerRedo() {
@@ -826,7 +834,7 @@ const [selFace,  setSelFace]  = useState(null)
     undoStackRef.current.push(JSON.stringify(dataRef.current))
     dataRef.current = JSON.parse(redoStackRef.current.pop())
     setDataVer(v=>v+1); setDirty(true)
-    rebuildScene()
+    rebuildScene(); notifyBar()
   }
 
   modelerUndoRef.current = modelerUndo
@@ -888,7 +896,13 @@ const [selFace,  setSelFace]  = useState(null)
       const partData = dataRef.current?.models[0]?.submodels?.[0] ?? dataRef.current?.models[0]
       return { partObj: partObjRef.current, partData }
     },
-  }), [])
+    setTcMode: m => setTcMode(m),
+    setShowGrid: v => setShowGrid(v),
+    addCube,
+    deleteSelected,
+    undo: modelerUndo,
+    redo: modelerRedo,
+  }), []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function revert() {
     dataRef.current=origRef.current
@@ -939,10 +953,10 @@ const [selFace,  setSelFace]  = useState(null)
   return (
     <div style={embedded ? { flex:1, display:'flex', flexDirection:'column', overflow:'hidden' } : s.page}>
 
-      {/* Toolbar */}
-      <div style={s.topBar}>
-        {onBack && <div style={s.divider}/>}
-        {!embedded && <>
+      {/* Toolbar — hidden when embedded (tools live in Studio's center top bar) */}
+      {!embedded && (
+        <div style={s.topBar}>
+          {onBack && <div style={s.divider}/>}
           <button style={editMode==='body'?s.btnAct:s.btnSm} onClick={()=>setEditMode('body')}>Body</button>
           <button style={editMode==='part'?s.btnAct:s.btnSm} onClick={()=>setEditMode('part')}>Part</button>
           {editMode==='body'
@@ -957,23 +971,23 @@ const [selFace,  setSelFace]  = useState(null)
             <div style={s.divider}/>
             <button style={showBody?s.btnAct:s.btnSm} onClick={()=>setShowBody(v=>!v)} title="Toggle body preview">◉ Body</button>
           </>}
-        </>}
-        <div style={s.divider}/>
-        <button style={tcMode==='translate'?s.btnAct:s.btnSm} onClick={()=>setTcMode('translate')} title="Move (W)">⤢ Move</button>
-        <button style={tcMode==='rotate'   ?s.btnAct:s.btnSm} onClick={()=>setTcMode('rotate')}    title="Rotate (E)">↻ Rotate</button>
-        <button style={tcMode==='pivot'    ?s.btnAct:s.btnSm} onClick={()=>setTcMode('pivot')}     title="Move pivot (keeps geometry in place)">⊙ Pivot</button>
-        <div style={s.divider}/>
-        <button style={showGrid?s.btnAct:s.btnSm} onClick={()=>setShowGrid(v=>!v)}>⊞ Grid</button>
-        <div style={s.divider}/>
-        <button style={s.btnSm} onClick={addCube}>+ Cube</button>
-        <button style={{...s.btnSm,opacity:sel?1:0.4}} onClick={deleteSelected} disabled={!sel} title="Delete (Del)">✕ Delete</button>
-        <div style={{marginLeft:'auto',display:'flex',gap:'6px',alignItems:'center'}}>
-          {status==='ok'&&<span style={s.ok}>Saved!</span>}
-          {status&&status!=='ok'&&<span style={s.err}>{status}</span>}
-          <button style={{...s.btnSm,opacity:dirty?1:0.4}} onClick={revert} disabled={!dirty}>Revert</button>
-          <button style={s.btn} onClick={save}>Save</button>
+          <div style={s.divider}/>
+          <button style={tcMode==='translate'?s.btnAct:s.btnSm} onClick={()=>setTcMode('translate')} title="Move (W)">⤢ Move</button>
+          <button style={tcMode==='rotate'   ?s.btnAct:s.btnSm} onClick={()=>setTcMode('rotate')}    title="Rotate (E)">↻ Rotate</button>
+          <button style={tcMode==='pivot'    ?s.btnAct:s.btnSm} onClick={()=>setTcMode('pivot')}     title="Move pivot (keeps geometry in place)">⊙ Pivot</button>
+          <div style={s.divider}/>
+          <button style={showGrid?s.btnAct:s.btnSm} onClick={()=>setShowGrid(v=>!v)}>⊞ Grid</button>
+          <div style={s.divider}/>
+          <button style={s.btnSm} onClick={addCube}>+ Cube</button>
+          <button style={{...s.btnSm,opacity:sel?1:0.4}} onClick={deleteSelected} disabled={!sel} title="Delete (Del)">✕ Delete</button>
+          <div style={{marginLeft:'auto',display:'flex',gap:'6px',alignItems:'center'}}>
+            {status==='ok'&&<span style={s.ok}>Saved!</span>}
+            {status&&status!=='ok'&&<span style={s.err}>{status}</span>}
+            <button style={{...s.btnSm,opacity:dirty?1:0.4}} onClick={revert} disabled={!dirty}>Revert</button>
+            <button style={s.btn} onClick={save}>Save</button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div style={s.content}>
 

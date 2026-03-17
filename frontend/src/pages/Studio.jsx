@@ -166,6 +166,7 @@ export default function Studio() {
   const [texEditorMode, setTexEditorMode] = useState(false)
   const [modelerMode, setModelerMode] = useState(null) // null | { partId, bodyId }
   const [showGrid, setShowGrid] = useState(true)
+  const [modelerBar, setModelerBar] = useState({ tcMode: 'translate', showGrid: false, hasSel: false, undoCount: 0, redoCount: 0 })
 
   // Shared data
   const [bodies, setBodies] = useState([])
@@ -1140,8 +1141,22 @@ export default function Studio() {
         <div style={{ ...s.centerPanel, position: 'relative', display: 'flex', flexDirection: 'column' }}>
 
           {/* Toolbox bar above viewer */}
-          {editTab !== 'modeler' && (
-            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 6px', borderBottom: '1px solid var(--bdr-dk)', background: 'var(--bg-panel)', flexWrap: 'wrap' }}>
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 6px', borderBottom: '1px solid var(--bdr-dk)', background: 'var(--bg-panel)', flexWrap: 'wrap' }}>
+            {editTab === 'modeler' ? <>
+              {/* Block Editor toolbar */}
+              {[['translate','⤢','Move (W)'],['rotate','↻','Rotate (E)'],['pivot','⊙','Move Pivot']].map(([id,icon,label]) => (
+                <button key={id} title={label}
+                  style={{ ...s.btnSm, ...(modelerBar.tcMode===id ? { background:'var(--bg-btn-active)', borderTopColor:'var(--bdr-dk)', borderLeftColor:'var(--bdr-dk)', borderRightColor:'var(--bdr-input-lt)', borderBottomColor:'var(--bdr-input-lt)' } : {}) }}
+                  onClick={() => modelerRef.current?.setTcMode(id)}>{icon}</button>
+              ))}
+              <div style={{ width: '1px', height: '18px', background: 'var(--bdr-dk)', margin: '0 2px' }} />
+              <button title="Undo (Ctrl+Z)" style={{ ...s.btnSm, opacity: modelerBar.undoCount ? 1 : 0.4 }} onClick={() => modelerRef.current?.undo()} disabled={!modelerBar.undoCount}>↩</button>
+              <button title="Redo (Ctrl+Shift+Z)" style={{ ...s.btnSm, opacity: modelerBar.redoCount ? 1 : 0.4 }} onClick={() => modelerRef.current?.redo()} disabled={!modelerBar.redoCount}>↪</button>
+              <div style={{ width: '1px', height: '18px', background: 'var(--bdr-dk)', margin: '0 2px' }} />
+              <button title="Add Cube" style={s.btnSm} onClick={() => modelerRef.current?.addCube()}>+ Cube</button>
+              <button title="Delete Selected (Del)" style={{ ...s.btnSm, opacity: modelerBar.hasSel ? 1 : 0.4 }} onClick={() => modelerRef.current?.deleteSelected()} disabled={!modelerBar.hasSel}>✕ Delete</button>
+            </> : <>
+              {/* Texture toolbar */}
               {[['drag','✥'],['pencil','✏'],['fill','▦'],['eraser','◻'],['eye','⊕']].map(([id, icon]) => (
                 <button key={id} title={id} style={{ ...s.btnSm, ...(tool===id ? { background:'var(--bg-btn-active)', borderTopColor:'var(--bdr-dk)', borderLeftColor:'var(--bdr-dk)', borderRightColor:'var(--bdr-input-lt)', borderBottomColor:'var(--bdr-input-lt)' } : {}) }}
                   onClick={() => setTool(id)}>{icon}</button>
@@ -1159,8 +1174,11 @@ export default function Studio() {
                 onChange={e => onHexChange(e.target.value)} placeholder="#rrggbb" />
               <input type="range" min={0} max={255} value={alpha} onChange={e => setAlpha(Number(e.target.value))}
                 style={{ width: '60px', accentColor: 'var(--clr-accent)' }} title={`Alpha: ${alpha}`} />
-            </div>
-          )}
+            </>}
+            <div style={{ width: '1px', height: '18px', background: 'var(--bdr-dk)', margin: '0 2px' }} />
+            <button title="Toggle Grid" style={{ ...s.btnSm, ...(showGrid ? { background:'var(--bg-btn-active)', borderTopColor:'var(--bdr-dk)', borderLeftColor:'var(--bdr-dk)', borderRightColor:'var(--bdr-input-lt)', borderBottomColor:'var(--bdr-input-lt)' } : {}) }}
+              onClick={() => setShowGrid(g => !g)}>⊞ Grid</button>
+          </div>
 
           {/* 3D viewer */}
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -1208,7 +1226,9 @@ export default function Studio() {
             <Modeler ref={modelerRef} sharedViewerRef={viewerRef} embedded texturePatch={texturePatch}
               bodyId={bodyId}
               partId={composeSelItem?.kind === 'part' ? composeSelItem.partId : null}
-              onBack={() => switchEditTab('texture')} />
+              onBack={() => switchEditTab('texture')}
+              onBarUpdate={setModelerBar}
+              showGridProp={showGrid} />
           ) : (
           <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'0', background:'var(--bg-panel)', minHeight:0 }}>
 
