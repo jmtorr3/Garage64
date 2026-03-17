@@ -191,6 +191,7 @@ export default function Studio() {
   // ── Shared viewer ref (center CemViewer exposed to Modeler) ─────────────────
   const viewerRef  = useRef(null)
   const modelerRef = useRef(null)
+  const redrawRef  = useRef(null)
   const initialCamera = useMemo(() => {
     const raw = sessionStorage.getItem('garage64_camera')
     if (!raw) return null
@@ -226,6 +227,7 @@ export default function Studio() {
   const [colorHistory, setColorHistory] = useState([])
   const [hoverPixel,   setHoverPixel]   = useState(null)
   const [texStatus,    setTexStatus]    = useState('')
+  const [viewerVer,    setViewerVer]    = useState(0)
   const canvasRef  = useRef(null)
   const bufRef     = useRef(null)
   const drawingRef = useRef(false)
@@ -458,6 +460,8 @@ export default function Studio() {
     }
   }, [zoom])
 
+  redrawRef.current = redraw
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     redraw()
@@ -602,6 +606,7 @@ export default function Studio() {
       viewerStrokeRef.current = true
     }
     paintPixel(px, py)
+    redrawRef.current?.()
     setTexturePatch({ path: texPath, canvas: buf })
   }
   function onTexWheel(e) {
@@ -633,11 +638,16 @@ export default function Studio() {
     variants.filter(v => currentBody && v.body_name === currentBody.name),
     [variants, currentBody])
 
+  function refreshViewers() {
+    viewerRef.current?.triggerRebuild()
+    setViewerVer(v => v + 1)
+  }
+
   async function texSave() {
     if (!bufRef.current||!texPath) { setTexStatus('No texture loaded.'); return }
     setTexStatus('')
     bufRef.current.toBlob(async blob => {
-      try { await api.saveTexture(texPath, blob); setTexStatus('ok'); setTexDirty(false) }
+      try { await api.saveTexture(texPath, blob); setTexStatus('ok'); setTexDirty(false); refreshViewers() }
       catch (e) { setTexStatus(e.message) }
     }, 'image/png')
   }
@@ -672,6 +682,7 @@ export default function Studio() {
         setTexPath(saveAsPath)
         setTexStatus('ok')
         setTexDirty(false)
+        refreshViewers()
       } catch (e) { setTexStatus(e.message) }
     }, 'image/png')
   }
@@ -688,7 +699,7 @@ export default function Studio() {
         setVariants(vs => vs.map(v => v.id === variant.id
           ? { ...v, texture_override: `minecraft:optifine/cem/${currentBody.name}/variants/${variant.file_name}.png` }
           : v))
-        setTexStatus('ok'); setTexDirty(false)
+        setTexStatus('ok'); setTexDirty(false); refreshViewers()
       } catch (e) { setTexStatus(e.message) }
     }, 'image/png')
   }
@@ -957,7 +968,7 @@ export default function Studio() {
                     <div style={s.slotBox}>
                       <div style={s.miniViewer}>
                         {partMini
-                          ? <CemViewer jem={partMini} onError={()=>{}} autoRotate sidebarOffset={0} showGrid={false} showAxes={false} fitScale={0.55} enableZoom={false} bgColor={bg} />
+                          ? <CemViewer key={viewerVer} jem={partMini} onError={()=>{}} autoRotate sidebarOffset={0} showGrid={false} showAxes={false} fitScale={0.55} enableZoom={false} bgColor={bg} />
                           : <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.25)', fontSize:'10px', fontFamily:'Monocraft, sans-serif' }}>no preview</div>
                         }
                       </div>
@@ -1000,7 +1011,7 @@ export default function Studio() {
               </div>
               {showBodyViewer && <div style={s.miniViewer}>
                 {bodyMiniJem
-                  ? <CemViewer jem={bodyMiniJem} onError={()=>{}} autoRotate sidebarOffset={0} showGrid={false} showAxes={false} fitScale={0.55} enableZoom={false} bgColor={bg} />
+                  ? <CemViewer key={viewerVer} jem={bodyMiniJem} onError={()=>{}} autoRotate sidebarOffset={0} showGrid={false} showAxes={false} fitScale={0.55} enableZoom={false} bgColor={bg} />
                   : <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.25)', fontSize:'10px', fontFamily:'Monocraft, sans-serif' }}>no body</div>
                 }
               </div>}
@@ -1031,7 +1042,7 @@ export default function Studio() {
                   </div>
                   {showSlotViewer[slot.name] !== false && <div style={s.miniViewer}>
                     {miniJem
-                      ? <CemViewer jem={miniJem} onError={()=>{}} autoRotate sidebarOffset={0} showGrid={false} showAxes={false} fitScale={0.55} enableZoom={false} bgColor={bg} />
+                      ? <CemViewer key={`${slot.id}-${viewerVer}`} jem={miniJem} onError={()=>{}} autoRotate sidebarOffset={0} showGrid={false} showAxes={false} fitScale={0.55} enableZoom={false} bgColor={bg} />
                       : <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.25)', fontSize:'10px', fontFamily:'Monocraft, sans-serif' }}>Create New Part</div>
                     }
                   </div>}

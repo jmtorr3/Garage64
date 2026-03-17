@@ -311,6 +311,7 @@ const CemViewer = forwardRef(function CemViewer({
 
     let cancelled = false
     const loader   = new THREE.TextureLoader()
+    loader.manager.setURLModifier(url => `${url}&_t=${Date.now()}`)
     const rawPaths = collectTexturePaths(jem)
 
     Promise.all(
