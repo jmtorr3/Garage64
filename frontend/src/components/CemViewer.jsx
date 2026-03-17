@@ -13,12 +13,18 @@ function disposeGroup(group) {
   })
 }
 
-export default function CemViewer({ jem, onError, autoRotate = false, sidebarOffset = 0, showGrid = true, showAxes = true, fitScale = 1.0, enableZoom = true }) {
+export default function CemViewer({ jem, onError, autoRotate = false, sidebarOffset = 0, showGrid = true, showAxes = true, fitScale = 1.0, enableZoom = true, bgColor = null }) {
   const mountRef = useRef(null)
   const ctxRef  = useRef(null)   // { scene, camera, controls, renderer, grid, modelGroup, firstLoad }
   const sidebarOffsetRef = useRef(sidebarOffset)
   useEffect(() => { sidebarOffsetRef.current = sidebarOffset }, [sidebarOffset])
   const fitScaleRef = useRef(fitScale)
+
+  // Update background when theme changes
+  useEffect(() => {
+    if (!ctxRef.current) return
+    ctxRef.current.scene.background = new THREE.Color(bgColor ?? 0x1a1a2e)
+  }, [bgColor])
 
   // ── One-time scene / camera setup ────────────────────────────────────────
   useEffect(() => {
@@ -32,7 +38,7 @@ export default function CemViewer({ jem, onError, autoRotate = false, sidebarOff
     mount.appendChild(renderer.domElement)
 
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x1a1a2e)
+    scene.background = new THREE.Color(bgColor ?? 0x1a1a2e)
     const grid = showGrid ? new THREE.GridHelper(128, 32, 0x333355, 0x222233) : null
     if (grid) scene.add(grid)
     if (showAxes) scene.add(new THREE.AxesHelper(8))
@@ -124,6 +130,10 @@ export default function CemViewer({ jem, onError, autoRotate = false, sidebarOff
       modelGroup.position.z -= center.z
       modelGroup.position.y -= box.min.y   // sit on grid
       if (grid) grid.position.y = 0
+
+      // Aim orbit at the vertical centre of the model so nothing gets clipped
+      const modelHeight = box.max.y - box.min.y
+      controls.target.set(0, modelHeight / 2, 0)
 
       // Fit camera only on the very first model load; leave it alone after that
       if (ctx.firstLoad) {

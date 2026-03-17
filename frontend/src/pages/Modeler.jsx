@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useTheme } from '../ThemeContext'
 import * as THREE from 'three'
 import { OrbitControls }     from 'three/examples/jsm/controls/OrbitControls.js'
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
@@ -24,7 +25,7 @@ const s = {
   topBar:    { display:'flex', alignItems:'center', gap:'6px', padding:'4px 8px', flexShrink:0, borderBottom:'2px solid var(--bdr-dk)', background:'var(--bg-panel)' },
   content:   { flex:1, display:'flex', overflow:'hidden' },
   outliner:  { width:240, flexShrink:0, display:'flex', flexDirection:'column', overflow:'hidden', background:'var(--bg-panel)', borderRight:'2px solid var(--bdr-dk)' },
-  viewport:  { flex:1, position:'relative', overflow:'hidden', background:'#1a1a2e' },
+  viewport:  { flex:1, position:'relative', overflow:'hidden' },
   rPanel:    { width:270, flexShrink:0, display:'flex', flexDirection:'column', overflow:'hidden', background:'var(--bg-panel)', borderLeft:'2px solid var(--bdr-dk)' },
   label:     { color:'var(--clr-text-dim)', fontSize:'11px', fontFamily:'Monocraft, sans-serif' },
   btnSm:     XP_BTN_SM,
@@ -147,7 +148,7 @@ function getFaceRects(box) {
 // ── Outliner ──────────────────────────────────────────────────────────────────
 
 function OutlinerNode({model, modelPath, sel, onSel, depth=0}) {
-  const [open,setOpen]=useState(true)
+  const [open,setOpen]=useState(false)
   const indent=depth*14
   const isSel=sel?.kind==='model'&&selKey(sel)===selKey({kind:'model',modelPath})
   const hasChildren=(model.boxes?.length||0)+(model.submodels?.length||0)>0
@@ -209,6 +210,8 @@ function Vec3Input({label, value=[0,0,0], step=0.5, onChange}) {
 
 export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack } = {}) {
   const [searchParams] = useSearchParams()
+  const { isDark } = useTheme()
+  const bg = isDark ? '#1e1e1e' : '#ece9d8'
   const [editMode, setEditMode] = useState('body') // 'body' | 'part'
   const [bodies,  setBodies]  = useState([])
   const [bodyId,  setBodyId]  = useState(null)
@@ -228,6 +231,7 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
   const tcModeRef  = useRef('translate')
   useEffect(()=>{ selRef.current=sel },[sel])
   useEffect(()=>{ tcModeRef.current=tcMode },[tcMode])
+  useEffect(()=>{ if (ctxRef.current) ctxRef.current.scene.background=new THREE.Color(bg) },[bg])
 
   // Three.js
   const mountRef    = useRef(null)
@@ -294,9 +298,7 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
     renderer.setSize(w,h); renderer.setPixelRatio(window.devicePixelRatio)
     mount.appendChild(renderer.domElement)
 
-    const scene=new THREE.Scene(); scene.background=new THREE.Color(0x1a1a2e)
-    scene.add(new THREE.GridHelper(128,32,0x333355,0x222233))
-    scene.add(new THREE.AxesHelper(8))
+    const scene=new THREE.Scene(); scene.background=new THREE.Color(bg)
 
     const camera=new THREE.PerspectiveCamera(55,w/h,0.1,2000)
     camera.position.set(30,20,40)

@@ -70,11 +70,8 @@ export default function NavBar() {
       <span style={s.brand}>Garage64</span>
       <div style={s.divider} />
       {[
-        { to: '/viewer',   label: 'Viewer'     },
+        { to: '/viewer',   label: 'Home'       },
         { to: '/gallery',  label: 'Garage'     },
-        { to: '/studio',   label: 'Studio'     },
-        { to: '/texture',  label: 'Texture'    },
-        { to: '/export',   label: 'Export'     },
       ].map(({ to, label }) => (
         <NavLink
           key={to}

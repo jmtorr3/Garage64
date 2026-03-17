@@ -3,10 +3,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import CemViewer from '../components/CemViewer'
 import Modeler from './Modeler'
+import { useTheme } from '../ThemeContext'
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ const s = {
   slotHeader:  { display: 'flex', alignItems: 'center', padding: '2px 8px', ...XP_TITLE, textTransform: 'uppercase' },
   slotTitle:   { flex: 1, fontSize: '11px', fontWeight: 'bold', color: 'var(--clr-text-on-title)', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'Monocraft, sans-serif' },
   slotBody:    { padding: '4px 8px' },
-  miniViewer:  { height: '90px', background: '#1a1a2e', position: 'relative', overflow: 'hidden', flexShrink: 0 },
+  miniViewer:  { height: '90px', position: 'relative', overflow: 'hidden', flexShrink: 0 },
   slotNav:     { display: 'flex', alignItems: 'center', gap: '3px', padding: '3px 4px', borderTop: '1px solid var(--bdr-dk)', flexShrink: 0 },
   slotNavBtn:  { padding: '1px 7px', background: 'var(--bg-btn)', borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', cursor: 'pointer', fontSize: '10px', fontFamily: 'Monocraft, sans-serif', flexShrink: 0 },
   partLabel:   { flex: 1, textAlign: 'center', fontSize: '10px', fontFamily: 'Monocraft, sans-serif', color: 'var(--clr-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 },
@@ -151,6 +152,9 @@ function partToMiniJem(part) {
 
 export default function Studio() {
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const { isDark } = useTheme()
+  const bg = isDark ? '#1e1e1e' : '#ece9d8'
 
   const [texEditorMode, setTexEditorMode] = useState(false)
   const [modelerMode, setModelerMode] = useState(null) // null | { partId, bodyId }
@@ -164,7 +168,8 @@ export default function Studio() {
   // ── Compose ──────────────────────────────────────────────────────────────────
   const [slotSel,    setSlotSel]    = useState({})
   const [extraSel,   setExtraSel]   = useState(new Set())
-  const [saveForm,   setSaveForm]   = useState({ file_name: '', trigger_name: '', order: 1 })
+  const [saveForm,        setSaveForm]        = useState({ file_name: '', trigger_name: '', order: 1 })
+  const [currentVariantId, setCurrentVariantId] = useState(null)
   const [saveStatus, setSaveStatus] = useState('')
   const [showManage, setShowManage] = useState(false)
   const [newSlot,    setNewSlot]    = useState({ name: '', display_name: '', order: '' })
@@ -225,6 +230,8 @@ export default function Studio() {
           }
           setSlotSel(newSlotSel)
           setExtraSel(newExtraSel)
+          setCurrentVariantId(v.id)
+          setSaveForm({ file_name: v.file_name, trigger_name: v.trigger_name || '', order: v.order ?? 1 })
         }).catch(() => { if (bs.length) setBodyId(bs[0].id) })
       } else if (bs.length) {
         setBodyId(bs[0].id)
@@ -233,6 +240,14 @@ export default function Studio() {
     api.getParts().then(ps => {
       setParts(ps)
       if (ps.length) { setUvPartId(ps[0].id) }
+      // Template: pre-select first part from each slot when creating new
+      if (!searchParams.get('variantId')) {
+        const template = {}
+        for (const p of ps) {
+          if (p.slot && !template[p.slot]) template[p.slot] = p.id
+        }
+        setSlotSel(template)
+      }
     })
     api.getSlots().then(setSlots)
     api.getVariants().then(setVariants)
@@ -531,9 +546,14 @@ export default function Studio() {
   async function saveVariant() {
     setSaveStatus('')
     if (!saveForm.file_name) { setSaveStatus('Enter a file name.'); return }
+    const payload = { file_name: saveForm.file_name, trigger_name: saveForm.trigger_name, body: bodyId, order: saveForm.order, part_ids: activeParts.map(p=>p.id) }
     try {
-      await api.createVariant({ file_name: saveForm.file_name, trigger_name: saveForm.trigger_name, body: bodyId, order: saveForm.order, part_ids: activeParts.map(p=>p.id) })
-      setSaveStatus('ok'); setSaveForm(f => ({ ...f, file_name: '' }))
+      if (currentVariantId) {
+        await api.updateVariant(currentVariantId, payload)
+      } else {
+        await api.createVariant(payload)
+      }
+      setSaveStatus('ok')
     } catch (e) { setSaveStatus(e.message) }
   }
   async function addSlot() {
@@ -744,6 +764,8 @@ export default function Studio() {
 
       {/* Top bar */}
       <div style={s.topBar}>
+        <button style={s.btnSm} onClick={() => navigate('/gallery')}>← Garage</button>
+        <button style={s.btnSm} onClick={() => setModelerMode({ bodyId })}>Modeler</button>
         <span style={s.label}>Body</span>
         <select style={s.selectSm} value={bodyId??''} onChange={e => setBodyId(Number(e.target.value))}>
           {bodies.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -769,7 +791,7 @@ export default function Studio() {
               <div style={s.slotHeader}><span style={s.slotTitle}>Body</span></div>
               <div style={s.miniViewer}>
                 {bodyMiniJem
-                  ? <CemViewer jem={bodyMiniJem} onError={()=>{}} autoRotate sidebarOffset={0} showGrid={false} showAxes={false} fitScale={0.55} enableZoom={false} />
+                  ? <CemViewer jem={bodyMiniJem} onError={()=>{}} autoRotate sidebarOffset={0} showGrid={false} showAxes={false} fitScale={0.55} enableZoom={false} bgColor={bg} />
                   : <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.25)', fontSize:'10px', fontFamily:'Monocraft, sans-serif' }}>no body</div>
                 }
               </div>
@@ -779,6 +801,7 @@ export default function Studio() {
                 <div style={s.editBtns}>
                   <button style={s.editBtn} title="Edit UV" onClick={() => setEditTab('body')}>UV</button>
                   <button style={s.editBtn} title="Edit texture" onClick={() => setEditTab('body')}>Tex</button>
+                  <button style={s.editBtn} title="Edit Model" onClick={() => setModelerMode({ bodyId })}>3D</button>
                 </div>
                 <button style={s.slotNavBtn} onClick={() => stepBody(1)}>▶</button>
               </div>
@@ -794,7 +817,7 @@ export default function Studio() {
                   <div style={s.slotHeader}><span style={s.slotTitle}>{slot.display_name}</span></div>
                   <div style={s.miniViewer}>
                     {miniJem
-                      ? <CemViewer jem={miniJem} onError={()=>{}} autoRotate sidebarOffset={0} showGrid={false} showAxes={false} fitScale={0.55} enableZoom={false} />
+                      ? <CemViewer jem={miniJem} onError={()=>{}} autoRotate sidebarOffset={0} showGrid={false} showAxes={false} fitScale={0.55} enableZoom={false} bgColor={bg} />
                       : <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.25)', fontSize:'10px', fontFamily:'Monocraft, sans-serif' }}>Create New Part</div>
                     }
                   </div>
@@ -805,6 +828,7 @@ export default function Studio() {
                       <div style={s.editBtns}>
                         <button style={s.editBtn} title="Edit UV" onClick={() => { setEditTab('part'); setUvPartId(selPart.id) }}>UV</button>
                         <button style={s.editBtn} title="Edit texture" onClick={() => { setEditTab('part'); setUvPartId(selPart.id) }}>Tex</button>
+                        <button style={s.editBtn} title="Edit Model" onClick={() => setModelerMode({ partId: selPart.id, bodyId })}>3D</button>
                       </div>
                     )}
                     <button style={s.slotNavBtn} onClick={() => stepSlotPart(slot.name, 1)}>▶</button>
@@ -830,6 +854,7 @@ export default function Studio() {
                       <div style={s.editBtns} onClick={e => e.stopPropagation()}>
                         <button style={s.editBtn} title="Edit UV" onClick={() => { setEditTab('part'); setUvPartId(p.id) }}>UV</button>
                         <button style={s.editBtn} title="Edit texture" onClick={() => { setEditTab('part'); setUvPartId(p.id) }}>Tex</button>
+                        <button style={s.editBtn} title="Edit Model" onClick={() => setModelerMode({ partId: p.id, bodyId })}>3D</button>
                       </div>
                     </div>
                   ))}
@@ -891,7 +916,7 @@ export default function Studio() {
         {/* ── Center: 3D viewer + floating canvas panel ── */}
         <div style={s.centerPanel}>
           {jem
-            ? <CemViewer jem={jem} onError={()=>{}} />
+            ? <CemViewer jem={jem} onError={()=>{}} showGrid={false} showAxes={false} bgColor={bg} />
             : <div style={{ color:'var(--clr-text-dim)', padding:'2rem', fontSize:'0.9rem' }}>Select a body to preview.</div>}
 
         </div>
@@ -1053,15 +1078,6 @@ export default function Studio() {
             </div>
 
           </div>{/* scrollable content */}
-
-          {/* Edit Model shortcut */}
-          <div style={{ padding:'6px 8px', display:'flex', alignItems:'center', gap:'8px', borderTop:'2px solid var(--bdr-dk)', background:'var(--bg-panel)', flexShrink:0 }}>
-            <button style={s.btn} onClick={() => {
-              if (editTab === 'part' && uvPartId) setModelerMode({ partId: uvPartId, bodyId })
-              else setModelerMode({ bodyId })
-            }}>Edit Model →</button>
-            <span style={s.label}>{editTab === 'part' ? (activeParts.find(p=>p.id===uvPartId)?.name ?? '—') : (currentBody?.name ?? '—')}</span>
-          </div>
 
         </div>{/* right panel */}
 

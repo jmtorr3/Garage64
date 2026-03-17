@@ -1,5 +1,18 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
+import CemViewer from '../components/CemViewer'
+
+function partToJem(part) {
+  const meta = part.attachment_meta || {}
+  const tex = (meta.textureFile || meta.texture || '').replace(/^minecraft:/, '')
+  const outerModel = { ...meta, submodels: [part.part_data] }
+  delete outerModel.model
+  return {
+    ...(tex ? { texture: tex } : {}),
+    textureSize: meta.textureSize || [64, 32],
+    models: [outerModel],
+  }
+}
 
 const XP_BTN    = { padding: '4px 14px', background: 'var(--bg-btn)', borderTop: '2px solid var(--bdr-btn-lt)', borderLeft: '2px solid var(--bdr-btn-lt)', borderRight: '2px solid var(--bdr-btn-dk)', borderBottom: '2px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', fontFamily: 'Monocraft, sans-serif', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }
 const XP_INPUT  = { width: '100%', padding: '3px 6px', background: 'var(--bg-input)', color: 'var(--clr-text)', borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)', fontFamily: 'Monocraft, sans-serif', fontSize: '11px', boxSizing: 'border-box' }
@@ -7,8 +20,10 @@ const XP_TITLE  = { background: 'var(--bg-title)', color: 'var(--clr-text-on-tit
 
 const s = {
   heading:   { fontSize: '13px', marginBottom: '1.25rem', color: 'var(--clr-accent)', fontWeight: 'bold', fontFamily: 'Monocraft, sans-serif' },
-  grid:      { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '8px' },
-  card:      { background: 'var(--bg-window)', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)', padding: '10px' },
+  grid:      { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '8px' },
+  card:      { background: 'var(--bg-window)', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)', display: 'flex', flexDirection: 'column' },
+  cardInfo:  { padding: '8px 10px' },
+  viewer:    { height: '180px', background: '#1a1a2e', flexShrink: 0 },
   cardTitle: { fontWeight: 'bold', marginBottom: '3px', color: 'var(--clr-text)', fontFamily: 'Monocraft, sans-serif', fontSize: '12px' },
   path:      { fontSize: '10px', color: 'var(--clr-text-dim)', marginBottom: '8px', wordBreak: 'break-all', fontFamily: 'monospace' },
   btn:       { ...XP_BTN, marginRight: '6px' },
@@ -107,6 +122,19 @@ export default function Parts() {
     setParts(ps => ps.filter(p => p.id !== id))
   }
 
+  function getBaseModel(part) {
+    const m = part.jpm_path.match(/optifine\/cem\/([^/]+)/)
+    return m ? m[1] : 'other'
+  }
+
+  const grouped = Object.entries(
+    parts.reduce((acc, p) => {
+      const key = getBaseModel(p)
+      ;(acc[key] = acc[key] || []).push(p)
+      return acc
+    }, {})
+  ).sort(([a], [b]) => a.localeCompare(b))
+
   return (
     <div>
       <h1 style={s.heading}>Parts (JPM)</h1>
@@ -156,16 +184,26 @@ export default function Parts() {
 
       <button style={{ ...s.btn, marginBottom: '1rem' }} onClick={openNew}>+ New Part</button>
 
-      <div style={s.grid}>
-        {parts.map(p => (
-          <div key={p.id} style={s.card}>
-            <div style={s.cardTitle}>{p.name}</div>
-            <div style={s.path}>{p.jpm_path}</div>
-            <button style={s.btn} onClick={() => openEdit(p)}>Edit</button>
-            <button style={{ ...s.btn, ...s.btnDanger }} onClick={() => del(p.id)}>Delete</button>
+      {grouped.map(([model, modelParts]) => (
+        <div key={model} style={{ marginBottom: '1.5rem' }}>
+          <div style={{ ...XP_TITLE, marginBottom: '8px', display: 'inline-block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{model}</div>
+          <div style={s.grid}>
+            {modelParts.map(p => (
+              <div key={p.id} style={s.card}>
+                <div style={s.viewer}>
+                  <CemViewer jem={partToJem(p)} showGrid={false} showAxes={false} autoRotate />
+                </div>
+                <div style={s.cardInfo}>
+                  <div style={s.cardTitle}>{p.name}</div>
+                  <div style={s.path}>{p.jpm_path}</div>
+                  <button style={s.btn} onClick={() => openEdit(p)}>Edit</button>
+                  <button style={{ ...s.btn, ...s.btnDanger }} onClick={() => del(p.id)}>Delete</button>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   )
 }

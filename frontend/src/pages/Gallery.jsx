@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import CemViewer from '../components/CemViewer'
 import Parts from './Parts'
+import Export from './Export'
+import { useTheme } from '../ThemeContext'
 
 const XP_BTN   = { fontSize: '11px', padding: '3px 10px', cursor: 'pointer', background: 'var(--bg-btn)', borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', fontFamily: 'Monocraft, sans-serif', fontWeight: 'bold' }
 const XP_INPUT = { width: '100%', padding: '3px 6px', background: 'var(--bg-input)', color: 'var(--clr-text)', borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)', fontFamily: 'Monocraft, sans-serif', fontSize: '11px', boxSizing: 'border-box' }
 
 const s = {
-  page:       { display: 'flex', height: 'calc(100vh - 48px)', overflow: 'hidden' },
+  page:       { display: 'flex', height: 'calc(100vh - 48px)', overflow: 'hidden', margin: '-1.5rem -2rem' },
   sidebar:    { width: '260px', flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '2px solid var(--bdr-dk)', overflow: 'hidden', background: 'var(--bg-panel)' },
   sideHead:   { display: 'flex', alignItems: 'center', padding: '4px 8px', borderBottom: '2px solid var(--bdr-dk)', gap: '6px', flexShrink: 0, background: 'var(--bg-title)' },
   sideTitle:  { flex: 1, fontWeight: 'bold', color: 'var(--clr-text-on-title)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'Monocraft, sans-serif' },
@@ -44,7 +46,9 @@ const EMPTY_FORM = { file_name: '', trigger_name: '', body: '', order: 1, part_i
 
 export default function Gallery() {
   const navigate = useNavigate()
-  const [gTab,        setGTab]        = useState('cars')  // 'cars' | 'parts'
+  const { isDark } = useTheme()
+  const bg = isDark ? '#1e1e1e' : '#ece9d8'
+  const [gTab,        setGTab]        = useState('cars')  // 'cars' | 'parts' | 'export'
   const [variants,    setVariants]    = useState([])
   const [parts,       setParts]       = useState([])
   const [bodies,      setBodies]      = useState([])
@@ -57,7 +61,7 @@ export default function Gallery() {
   const [formError,   setFormError]   = useState('')
 
   useEffect(() => {
-    api.getVariants().then(vs => { setVariants(vs); if (vs.length) setSelectedId(vs[0].id) })
+    api.getVariants().then(vs => { setVariants(vs); if (vs.length) setSelectedId(vs[vs.length - 1].id) })
     api.getParts().then(setParts)
     api.getBodies().then(setBodies)
   }, [])
@@ -76,8 +80,7 @@ export default function Gallery() {
 
   // ── form helpers ──────────────────────────────────────────────────────────────
   function openNew() {
-    setForm({ ...EMPTY_FORM, body: bodies[0]?.id ?? '' })
-    setEditing('new'); setFormError('')
+    navigate('/studio')
   }
 
   function openEdit(v) {
@@ -120,7 +123,7 @@ export default function Gallery() {
     await api.deleteVariant(id)
     const fresh = await api.getVariants()
     setVariants(fresh)
-    if (id === selectedId) setSelectedId(fresh[0]?.id ?? null)
+    if (id === selectedId) setSelectedId(fresh.length ? fresh[fresh.length - 1].id : null)
   }
 
   // ── render ────────────────────────────────────────────────────────────────────
@@ -130,19 +133,13 @@ export default function Gallery() {
       {/* ── Top header with tabs ── */}
       <div style={{ display: 'flex', alignItems: 'center', borderBottom: '2px solid var(--bdr-dk)', flexShrink: 0, background: 'var(--bg-panel)' }}>
         <span style={{ ...s.sideTitle, padding: '4px 10px', borderRight: '1px solid var(--bdr-dk)' }}>Garage</span>
-        {[['cars', 'Cars'], ['parts', 'Parts']].map(([id, label]) => (
+        {[['cars', 'Cars'], ['parts', 'Parts'], ['export', 'Export']].map(([id, label]) => (
           <button key={id} onClick={() => { setGTab(id); setEditing(null) }}
             style={{ padding: '4px 14px', fontSize: '11px', fontFamily: 'Monocraft, sans-serif', fontWeight: gTab === id ? 'bold' : 'normal', background: gTab === id ? 'var(--bg-window)' : 'transparent', color: gTab === id ? 'var(--clr-text)' : 'var(--clr-text-dim)', border: 'none', borderRight: '1px solid var(--bdr-dk)', cursor: 'pointer', height: '100%' }}>
             {label}
           </button>
         ))}
-        {gTab === 'cars' && (
-          <div style={{ marginLeft: '8px' }}>
-            {editing === null
-              ? <button style={s.btnSm} onClick={openNew}>+ New</button>
-              : <button style={s.btnSm} onClick={cancelEdit}>← Back</button>}
-          </div>
-        )}
+        <div style={{ flex: 1 }} />
       </div>
 
       {/* ── Parts tab ── */}
@@ -152,12 +149,25 @@ export default function Gallery() {
         </div>
       )}
 
+      {/* ── Export tab ── */}
+      {gTab === 'export' && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.5rem' }}>
+          <Export />
+        </div>
+      )}
+
       {/* ── Cars tab ── */}
       {gTab === 'cars' && (
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
           {/* Sidebar */}
           <div style={s.sidebar}>
+            <div style={{ ...s.sideHead, justifyContent: 'space-between' }}>
+              <span style={s.sideTitle}>Variants</span>
+              {editing === null
+                ? <button style={s.btnSm} onClick={openNew}>+ New</button>
+                : <button style={s.btnSm} onClick={cancelEdit}>← Back</button>}
+            </div>
             {editing !== null ? (
               /* ── Edit / New form ── */
               <div style={s.formPanel}>
@@ -212,7 +222,7 @@ export default function Gallery() {
             ) : (
               /* ── Variant list ── */
               <div style={s.list}>
-                {variants.map(v => {
+                {[...variants].reverse().map(v => {
                   const active = v.id === selectedId
                   return (
                     <div key={v.id}
@@ -257,7 +267,7 @@ export default function Gallery() {
               </div>
             )}
             <div style={{ ...s.viewerWrap, position: 'relative' }}>
-              <CemViewer jem={jem} onError={setViewError} autoRotate />
+              <CemViewer jem={jem} onError={setViewError} autoRotate showGrid={false} showAxes={false} bgColor={bg} />
               {!jem && !loading && (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--clr-text-dim)', fontSize: '0.9rem', pointerEvents: 'none' }}>
                   Select a variant to preview
