@@ -181,14 +181,17 @@ export default function Studio() {
   const [rightWidth, setRightWidth] = useState(320)
   const dragRef2 = useRef(null) // { side:'left'|'right', startX, startW }
 
+  // ── Compose selection (drives Advanced Editor) ───────────────────────────────
+  const [composeSelItem, setComposeSelItem] = useState({ kind: 'body' })
+
   // ── UV ────────────────────────────────────────────────────────────────────────
   const [editTab,     setEditTab]     = useState('texture') // 'texture' | 'modeler'
   const [uvPartId,    setUvPartId]    = useState(null)
+  const [texTargetId, setTexTargetId] = useState('')       // '' = body
   const [bodyData,    setBodyData]    = useState(null)
 
   // ── Texture ───────────────────────────────────────────────────────────────────
   const [variants,     setVariants]     = useState([])
-  const [texPartId,    setTexPartId]    = useState('__body__')
   const [texVariantId, setTexVariantId] = useState('')
   const [texPath,      setTexPath]      = useState('')
   const [zoom,         setZoom]         = useState(2)
@@ -286,6 +289,19 @@ export default function Studio() {
     return buildVirtualJem(currentBody.body_data, [])
   }, [currentBody])
 
+  const centerJem = useMemo(() => {
+    if (composeSelItem?.kind === 'body') return bodyMiniJem
+    if (composeSelItem?.kind === 'part') {
+      const p = parts.find(x => x.id === composeSelItem.partId)
+      return p ? partToMiniJem(p) : jem
+    }
+    return jem
+  }, [composeSelItem, bodyMiniJem, jem, parts])
+
+  // ── 3D viewer texture patch (for live paint on model) ────────────────────────
+  const [texturePatch, setTexturePatch] = useState(null)
+  const viewerStrokeRef = useRef(false) // true during a paint stroke in the 3D viewer
+
   // ── Dirty tracking ────────────────────────────────────────────────────────────
   const [texDirty, setTexDirty] = useState(false)
   const isDirty = texDirty
@@ -296,29 +312,22 @@ export default function Studio() {
     api.getBody(bodyId).then(b => { setBodyData(b.body_data) })
   }, [bodyId])
 
-  // Sync texPartId and zoom when uvPartId changes
+  // Reset zoom when uvPartId changes
   useEffect(() => {
-    if (!uvPartId) {
-      setTexPartId('__body__'); setZoom(2)
-    } else {
-      const validId = activeParts.find(p => p.id === uvPartId)?.id ?? null
-      if (validId) setTexPartId(String(validId))
-    }
+    setZoom(2)
   }, [uvPartId]) // eslint-disable-line react-hooks/exhaustive-deps
 
 
   // ── Texture effects ───────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!texPartId) return
-    if (texPartId === '__body__') {
+    if (!texTargetId) {
       if (bodyData?.texture) setTexPath(bodyData.texture.replace(/^minecraft:/, ''))
-      return
+    } else {
+      const p = parts.find(x => String(x.id) === texTargetId)
+      const raw = p?.attachment_meta?.textureFile || p?.attachment_meta?.texture || ''
+      if (raw) setTexPath(raw.replace(/^minecraft:/, ''))
     }
-    const p = parts.find(x => String(x.id) === texPartId)
-    if (!p) return
-    const raw = p.attachment_meta?.textureFile || p.attachment_meta?.texture || ''
-    if (raw) setTexPath(raw.replace(/^minecraft:/, ''))
-  }, [texPartId, parts, bodyData])
+  }, [texTargetId, parts, bodyData])
 
   useEffect(() => {
     bufRef.current = null; redraw()  // clear old texture immediately
@@ -465,8 +474,31 @@ export default function Studio() {
     }
     if (tool === 'pencil' || tool === 'eraser') paintPixel(px, py)
   }
-  function onTexUp()    { drawingRef.current = false; dragStartRef.current = null }
-  function onTexLeave() { drawingRef.current = false; dragStartRef.current = null; setHoverPixel(null) }
+  function onTexUp()    { drawingRef.current = false; dragStartRef.current = null; viewerStrokeRef.current = false }
+  function onTexLeave() { drawingRef.current = false; dragStartRef.current = null; setHoverPixel(null); viewerStrokeRef.current = false }
+
+  // Called by the center 3D viewer when user paints on the model surface
+  function onPaintUV(u, v, isFirst) {
+    const buf = bufRef.current
+    if (!buf || !texPath) return
+    const px = Math.floor(u * buf.width)
+    const py = Math.floor((1 - v) * buf.height)
+    if (px < 0 || py < 0 || px >= buf.width || py >= buf.height) return
+    if (tool === 'eye') {
+      const ctx = buf.getContext('2d')
+      const d = ctx.getImageData(px, py, 1, 1).data
+      const hex = rgbaToHex(d[0], d[1], d[2])
+      setColor(hex); setHexInput(hex); setAlpha(d[3]); pushHistory(hex); setTool('pencil')
+      return
+    }
+    if (isFirst && !viewerStrokeRef.current) {
+      if (tool === 'pencil' || tool === 'fill' || tool === 'eraser') saveTexUndoState()
+      if (tool === 'pencil') pushHistory(color)
+      viewerStrokeRef.current = true
+    }
+    paintPixel(px, py)
+    setTexturePatch({ path: texPath, canvas: buf })
+  }
   function onTexWheel(e) {
     e.preventDefault()
     const idx = ZOOM_LEVELS.indexOf(zoom)
@@ -764,8 +796,6 @@ export default function Studio() {
       {/* Top bar */}
       <div style={s.topBar}>
         <button style={s.btnSm} onClick={() => navigate('/gallery')}>← Garage</button>
-        <button style={s.btnSm} onClick={() => setModelerMode({ bodyId })}>Modeler</button>
-        <button style={{ ...s.btnSm, ...(showGrid ? { background: 'var(--bg-btn-active)', borderTop: '1px solid var(--bdr-dk)', borderLeft: '1px solid var(--bdr-dk)', borderRight: '1px solid var(--bdr-input-lt)', borderBottom: '1px solid var(--bdr-input-lt)' } : {}) }} onClick={() => setShowGrid(g => !g)}>⊞ Grid</button>
         <span style={s.label}>Body</span>
         <select style={s.selectSm} value={bodyId??''} onChange={e => setBodyId(Number(e.target.value))}>
           {bodies.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -787,7 +817,8 @@ export default function Studio() {
           <div style={s.tabContent}>
 
             {/* Body box */}
-            <div style={s.slotBox}>
+            <div style={{ ...s.slotBox, ...(composeSelItem?.kind==='body' ? { outline:'2px solid #4488ff' } : {}) }}
+              onClick={() => setComposeSelItem({ kind:'body' })}>
               <div style={s.slotHeader}><span style={s.slotTitle}>Body</span></div>
               <div style={s.miniViewer}>
                 {bodyMiniJem
@@ -812,7 +843,9 @@ export default function Studio() {
               const selPart   = slotParts.find(p => p.id === selected) || null
               const miniJem   = selPart ? partToMiniJem(selPart) : null
               return (
-                <div key={slot.id} style={s.slotBox}>
+                <div key={slot.id}
+                  style={{ ...s.slotBox, ...(composeSelItem?.kind==='part' && composeSelItem.partId===selPart?.id ? { outline:'2px solid #4488ff' } : {}) }}
+                  onClick={() => selPart && setComposeSelItem({ kind:'part', partId: selPart.id })}>
                   <div style={s.slotHeader}><span style={s.slotTitle}>{slot.display_name}</span></div>
                   <div style={s.miniViewer}>
                     {miniJem
@@ -912,28 +945,33 @@ export default function Studio() {
 
         {editTab === 'modeler' ? (
           <Modeler embedded
+            key={composeSelItem ? JSON.stringify(composeSelItem) : `body_${bodyId}`}
             bodyId={bodyId}
-            partId={uvPartId || undefined}
+            partId={composeSelItem?.kind==='part' ? composeSelItem.partId : undefined}
             onBack={() => setEditTab('texture')}
           />
         ) : <div style={{ display: 'contents' }}>
 
         {/* ── Center: 3D viewer ── */}
-        <div style={s.centerPanel}>
-          {jem
-            ? <CemViewer jem={jem} onError={()=>{}} showGrid={showGrid} showAxes={false} bgColor={bg} />
+        <div style={{ ...s.centerPanel, position: 'relative' }}>
+          {centerJem
+            ? <CemViewer jem={centerJem} onError={()=>{}} showGrid={showGrid} showAxes={false} bgColor={bg}
+                enablePaint={!!texPath && tool !== 'drag'} onPaintUV={onPaintUV} texturePatch={texturePatch} />
             : <div style={{ color:'var(--clr-text-dim)', padding:'2rem', fontSize:'0.9rem' }}>Select a body to preview.</div>}
+          <button
+            style={{ position:'absolute', bottom:'10px', left:'10px', ...s.btnSm, ...(showGrid ? { background:'var(--bg-btn-active)', borderTop:'1px solid var(--bdr-dk)', borderLeft:'1px solid var(--bdr-dk)', borderRight:'1px solid var(--bdr-input-lt)', borderBottom:'1px solid var(--bdr-input-lt)' } : {}) }}
+            onClick={() => setShowGrid(g => !g)}>⊞ Grid</button>
         </div>
 
         {/* ── Right divider ── */}
         <div style={s.divider} onMouseDown={e => { e.preventDefault(); dragRef2.current = { side:'right', startX: e.clientX, startW: rightWidth } }} />
 
-        {/* ── Right panel — Texture / Model Editor tabs ── */}
+        {/* ── Right panel — Texture / Advanced Editor tabs ── */}
         <div style={{ ...s.rightPanelEdit, width: rightWidth }}>
 
           {/* Tab bar */}
           <div style={s.tabBar}>
-            {[['texture','Texture'],['modeler','Model Editor']].map(([tab,label]) => (
+            {[['texture','Texture'],['modeler','Advanced Editor']].map(([tab,label]) => (
               <button key={tab}
                 style={{ ...s.tab, background: editTab===tab?'var(--clr-accent)':'var(--bg-panel-alt)', color: editTab===tab?'#fff':'var(--clr-text-dim)' }}
                 onClick={() => setEditTab(tab)}>{label}</button>
@@ -945,10 +983,17 @@ export default function Studio() {
 
             {/* Target selector */}
             <div style={{ padding:'4px 6px', display:'flex', gap:'4px', alignItems:'center', borderBottom:'1px solid var(--bdr-dk)', flexShrink:0 }}>
-              <select style={{ ...s.select, flex:1 }} value={uvPartId??''} onChange={e => { const id = e.target.value ? Number(e.target.value) : null; setUvPartId(id); setTexPartId(id ? String(id) : '__body__') }}>
-                <option value="">Body: {currentBody?.name ?? '—'}</option>
-                {activeParts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+              {editTab === 'texture' ? (
+                <select style={{ ...s.select, flex:1 }} value={texTargetId} onChange={e => setTexTargetId(e.target.value)}>
+                  <option value="">Body: {currentBody?.name ?? '—'}</option>
+                  {activeParts.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+                </select>
+              ) : (
+                <select style={{ ...s.select, flex:1 }} value={uvPartId??''} onChange={e => { const id = e.target.value ? Number(e.target.value) : null; setUvPartId(id) }}>
+                  <option value="">Body: {currentBody?.name ?? '—'}</option>
+                  {activeParts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              )}
             </div>
 
             {/* ── TEXTURE PAINTER ── */}

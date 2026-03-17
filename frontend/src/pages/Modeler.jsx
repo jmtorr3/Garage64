@@ -147,14 +147,34 @@ function getFaceRects(box) {
 
 // ── Outliner ──────────────────────────────────────────────────────────────────
 
-function OutlinerNode({model, modelPath, sel, onSel, depth=0}) {
+function OutlinerNode({model, modelPath, sel, onSel, onDragStart, onDrop, depth=0}) {
   const [open,setOpen]=useState(false)
+  const [dropOver, setDropOver]=useState(false)
   const indent=depth*14
   const isSel=sel?.kind==='model'&&selKey(sel)===selKey({kind:'model',modelPath})
+
+  // Auto-open when selection is inside this node
+  useEffect(()=>{
+    if (!sel?.modelPath) return
+    const sp=sel.modelPath
+    // This node is an ancestor of the selected path
+    const isAnc = sp.length > modelPath.length && modelPath.every((v,i)=>sp[i]===v)
+    // A box inside this exact model is selected
+    const isParent = sel.kind==='box' && sp.length===modelPath.length && modelPath.every((v,i)=>sp[i]===v)
+    if (isAnc || isParent) setOpen(true)
+  },[sel]) // eslint-disable-line react-hooks/exhaustive-deps
   const hasChildren=(model.boxes?.length||0)+(model.submodels?.length||0)>0
   return (
     <div>
-      <div style={{...s.treeRow, paddingLeft:4+indent, background:isSel?'var(--clr-accent)':'transparent', color:isSel?'#fff':'var(--clr-text)'}}
+      <div draggable
+        onDragStart={e=>{e.stopPropagation();onDragStart({kind:'model',modelPath})}}
+        onDragOver={e=>{e.preventDefault();e.stopPropagation();setDropOver(true)}}
+        onDragLeave={()=>setDropOver(false)}
+        onDrop={e=>{e.stopPropagation();setDropOver(false);onDrop({kind:'model',modelPath})}}
+        style={{...s.treeRow, paddingLeft:4+indent,
+          background:isSel?'var(--clr-accent)':dropOver?'rgba(100,160,255,0.18)':'transparent',
+          color:isSel?'#fff':'var(--clr-text)',
+          outline:dropOver?'1px dashed #4488ff':'none', cursor:'grab'}}
         onClick={()=>onSel({kind:'model',modelPath})}>
         <span style={{fontSize:'9px',width:'10px',color:isSel?'#fff':'var(--clr-text-dim)',flexShrink:0}}
           onClick={e=>{e.stopPropagation();setOpen(v=>!v)}}>
@@ -168,20 +188,37 @@ function OutlinerNode({model, modelPath, sel, onSel, depth=0}) {
           const boxSel={kind:'box',modelPath,boxIdx:bi}
           const bSel=sel?.kind==='box'&&selKey(sel)===selKey(boxSel)
           return (
-            <div key={bi} style={{...s.treeRow, paddingLeft:4+indent+18, background:bSel?'var(--clr-accent)':'transparent', color:bSel?'#fff':'var(--clr-text)'}}
-              onClick={()=>onSel(boxSel)}>
-              <span style={{color:bSel?'#fff':'#ffaa55'}}>□</span>
-              <span>cube {bi}</span>
-              {box.coordinates&&<span style={{color:'rgba(160,160,160,0.5)',fontSize:'10px',marginLeft:4}}>
-                {box.coordinates.slice(0,3).map(v=>Math.round(v)).join(',')}
-              </span>}
-            </div>
+            <BoxRow key={bi} box={box} bi={bi} indent={indent} bSel={bSel} modelPath={modelPath}
+              onSel={onSel} onDragStart={onDragStart} onDrop={onDrop} boxSel={boxSel}/>
           )
         })}
         {(model.submodels||[]).map((sub,si)=>(
-          <OutlinerNode key={si} model={sub} modelPath={[...modelPath,si]} sel={sel} onSel={onSel} depth={depth+1}/>
+          <OutlinerNode key={si} model={sub} modelPath={[...modelPath,si]} sel={sel} onSel={onSel}
+            onDragStart={onDragStart} onDrop={onDrop} depth={depth+1}/>
         ))}
       </>}
+    </div>
+  )
+}
+
+function BoxRow({box, bi, indent, bSel, modelPath, onSel, onDragStart, onDrop, boxSel}) {
+  const [dropOver, setDropOver]=useState(false)
+  return (
+    <div draggable
+      onDragStart={e=>{e.stopPropagation();onDragStart({kind:'box',modelPath,boxIdx:bi})}}
+      onDragOver={e=>{e.preventDefault();e.stopPropagation();setDropOver(true)}}
+      onDragLeave={()=>setDropOver(false)}
+      onDrop={e=>{e.stopPropagation();setDropOver(false);onDrop({kind:'box',modelPath,boxIdx:bi})}}
+      style={{...s.treeRow, paddingLeft:4+indent+18,
+        background:bSel?'var(--clr-accent)':dropOver?'rgba(100,160,255,0.18)':'transparent',
+        color:bSel?'#fff':'var(--clr-text)',
+        outline:dropOver?'1px dashed #4488ff':'none', cursor:'grab'}}
+      onClick={()=>onSel(boxSel)}>
+      <span style={{color:bSel?'#fff':'#ffaa55'}}>□</span>
+      <span>cube {bi}</span>
+      {box.coordinates&&<span style={{color:'rgba(160,160,160,0.5)',fontSize:'10px',marginLeft:4}}>
+        {box.coordinates.slice(0,3).map(v=>Math.round(v)).join(',')}
+      </span>}
     </div>
   )
 }
@@ -224,6 +261,8 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
   const [status,   setStatus]  = useState('')
   const [dataVer,  setDataVer] = useState(0) // bumped to force re-render from ref
   const [showGrid, setShowGrid] = useState(false)
+
+  const dragItemRef = useRef(null)
 
   // Model data lives in a ref so TC sync doesn't trigger rebuilds
   const dataRef    = useRef(null)
@@ -313,6 +352,7 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
 
     const orbit=new OrbitControls(camera,renderer.domElement)
     orbit.enableDamping=true; orbit.dampingFactor=0.08; orbit.minDistance=5; orbit.maxDistance=400
+    orbit.mouseButtons={ LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.PAN }
 
     const tc=new TransformControls(camera,renderer.domElement)
     tc.setMode('translate')
@@ -665,6 +705,41 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
     setDataVer(v=>v+1); setDirty(false); clearSel(); setStatus('')
   }
 
+  function handleDragStart(item) {
+    dragItemRef.current = item
+  }
+
+  function handleDrop(target) {
+    const src = dragItemRef.current
+    dragItemRef.current = null
+    if (!src || !dataRef.current) return
+    const data = dataRef.current
+
+    // Reorder cubes within the same model
+    if (src.kind==='box' && target.kind==='box' &&
+        JSON.stringify(src.modelPath)===JSON.stringify(target.modelPath) &&
+        src.boxIdx !== target.boxIdx) {
+      bump(updateNode(data.models, src.modelPath, n => {
+        const boxes = [...(n.boxes||[])]
+        const [moved] = boxes.splice(src.boxIdx, 1)
+        boxes.splice(target.boxIdx, 0, moved)
+        return {...n, boxes}
+      }))
+      return
+    }
+
+    // Reorder top-level bones
+    if (src.kind==='model' && target.kind==='model' &&
+        src.modelPath.length===1 && target.modelPath.length===1 &&
+        src.modelPath[0] !== target.modelPath[0]) {
+      const models = [...data.models]
+      const [moved] = models.splice(src.modelPath[0], 1)
+      models.splice(target.modelPath[0], 0, moved)
+      dataRef.current = {...data, models}
+      setDataVer(v=>v+1); setDirty(true)
+    }
+  }
+
   // ── Derived for render ─────────────────────────────────────────────────────
   const data=dataRef.current
   const selModel=sel?.kind==='model' ? getNode(data?.models,sel.modelPath) : null
@@ -676,7 +751,7 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
 
       {/* Toolbar */}
       <div style={s.topBar}>
-        {onBack && <><button style={s.btnSm} onClick={onBack}>← Studio</button><div style={s.divider}/></>}
+        {onBack && <><button style={s.btnSm} onClick={onBack}>← Simple Editor</button><div style={s.divider}/></>}
         <button style={editMode==='body'?s.btnAct:s.btnSm} onClick={()=>setEditMode('body')}>Body</button>
         <button style={editMode==='part'?s.btnAct:s.btnSm} onClick={()=>setEditMode('part')}>Part</button>
         {editMode==='body'
@@ -714,7 +789,7 @@ export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack
           <div style={XP_TITLE}>Outliner</div>
           <div style={{flex:1,overflowY:'auto'}}>
             {(data?.models||[]).map((model,mi)=>(
-              <OutlinerNode key={mi} model={model} modelPath={[mi]} sel={sel} onSel={selectAndAttach} depth={0}/>
+              <OutlinerNode key={mi} model={model} modelPath={[mi]} sel={sel} onSel={selectAndAttach} onDragStart={handleDragStart} onDrop={handleDrop} depth={0}/>
             ))}
           </div>
         </div>

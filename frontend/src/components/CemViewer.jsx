@@ -13,26 +13,47 @@ function disposeGroup(group) {
   })
 }
 
-export default function CemViewer({ jem, onError, autoRotate = false, sidebarOffset = 0, showGrid = true, showAxes = true, fitScale = 1.0, enableZoom = true, bgColor = null }) {
-  const mountRef = useRef(null)
-  const ctxRef  = useRef(null)   // { scene, camera, controls, renderer, grid, modelGroup, firstLoad }
+export default function CemViewer({
+  jem, onError,
+  autoRotate = false, sidebarOffset = 0,
+  showGrid = true, showAxes = true,
+  fitScale = 1.0, enableZoom = true, bgColor = null,
+  // 3D painting
+  enablePaint = false, onPaintUV = null, texturePatch = null,
+}) {
+  const mountRef       = useRef(null)
+  const ctxRef         = useRef(null)
   const sidebarOffsetRef = useRef(sidebarOffset)
-  useEffect(() => { sidebarOffsetRef.current = sidebarOffset }, [sidebarOffset])
-  const fitScaleRef = useRef(fitScale)
+  const fitScaleRef    = useRef(fitScale)
+  const texMapRef      = useRef({})       // path → THREE.Texture
+  const enablePaintRef = useRef(enablePaint)
+  const onPaintUVRef   = useRef(onPaintUV)
+  const paintingRef    = useRef(false)
 
-  // Update background when theme changes
+  useEffect(() => { sidebarOffsetRef.current = sidebarOffset }, [sidebarOffset])
+  useEffect(() => { enablePaintRef.current  = enablePaint  }, [enablePaint])
+  useEffect(() => { onPaintUVRef.current    = onPaintUV    }, [onPaintUV])
+
+  // ── Live texture patch — update material map without reloading model ──────
+  useEffect(() => {
+    if (!texturePatch) return
+    const { path, canvas } = texturePatch
+    const tex = texMapRef.current[path]
+    if (tex) { tex.image = canvas; tex.needsUpdate = true }
+  }, [texturePatch])
+
+  // ── Background / grid ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!ctxRef.current) return
     ctxRef.current.scene.background = new THREE.Color(bgColor ?? 0x1a1a2e)
   }, [bgColor])
 
-  // Toggle grid visibility
   useEffect(() => {
     if (!ctxRef.current?.grid) return
     ctxRef.current.grid.visible = showGrid
   }, [showGrid])
 
-  // ── One-time scene / camera setup ────────────────────────────────────────
+  // ── One-time scene / camera / controls setup ──────────────────────────────
   useEffect(() => {
     const mount = mountRef.current
     const w = mount.clientWidth || 600
@@ -57,13 +78,50 @@ export default function CemViewer({ jem, onError, autoRotate = false, sidebarOff
     }
 
     const controls = new OrbitControls(camera, renderer.domElement)
-    controls.enableDamping    = true
-    controls.dampingFactor    = 0.08
-    controls.minDistance      = 5
-    controls.maxDistance      = 400
-    controls.autoRotate       = autoRotate
-    controls.autoRotateSpeed  = 1.5
-    controls.enableZoom       = enableZoom
+    controls.enableDamping   = true
+    controls.dampingFactor   = 0.08
+    controls.minDistance     = 5
+    controls.maxDistance     = 400
+    controls.autoRotate      = autoRotate
+    controls.autoRotateSpeed = 1.5
+    controls.enableZoom      = enableZoom
+    controls.mouseButtons    = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.PAN }
+
+    // ── Paint raycasting ──────────────────────────────────────────────────
+    const ray = new THREE.Raycaster()
+    function doPaint(e, isFirst) {
+      const ctx = ctxRef.current
+      if (!ctx?.modelGroup || !onPaintUVRef.current) return
+      const rect = mount.getBoundingClientRect()
+      ray.setFromCamera(new THREE.Vector2(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1,
+      ), camera)
+      const hits = ray.intersectObjects([ctx.modelGroup], true)
+      for (const hit of hits) {
+        if (hit.uv) { onPaintUVRef.current(hit.uv.x, hit.uv.y, isFirst); return }
+      }
+    }
+    function onDown(e) {
+      if (e.button !== 0 || !enablePaintRef.current) return
+      paintingRef.current = true
+      controls.enabled = false
+      doPaint(e, true)
+    }
+    function onMove(e) {
+      if (!paintingRef.current || !enablePaintRef.current) return
+      doPaint(e, false)
+    }
+    function onUp() {
+      if (!paintingRef.current) return
+      paintingRef.current = false
+      controls.enabled = true
+    }
+    const el = renderer.domElement
+    el.addEventListener('mousedown', onDown)
+    el.addEventListener('mousemove', onMove)
+    el.addEventListener('mouseup',   onUp)
+    el.addEventListener('mouseleave', onUp)
 
     let animId
     function animate() {
@@ -94,6 +152,10 @@ export default function CemViewer({ jem, onError, autoRotate = false, sidebarOff
       ro.disconnect()
       controls.dispose()
       renderer.dispose()
+      el.removeEventListener('mousedown', onDown)
+      el.removeEventListener('mousemove', onMove)
+      el.removeEventListener('mouseup',   onUp)
+      el.removeEventListener('mouseleave', onUp)
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement)
       ctxRef.current = null
     }
@@ -105,14 +167,13 @@ export default function CemViewer({ jem, onError, autoRotate = false, sidebarOff
     const ctx = ctxRef.current
     const { scene, camera, controls, grid } = ctx
 
-    // Remove previous model and free GPU memory
     if (ctx.modelGroup) {
       scene.remove(ctx.modelGroup)
       disposeGroup(ctx.modelGroup)
       ctx.modelGroup = null
     }
 
-    const loader = new THREE.TextureLoader()
+    const loader   = new THREE.TextureLoader()
     const rawPaths = collectTexturePaths(jem)
 
     Promise.all(
@@ -127,25 +188,28 @@ export default function CemViewer({ jem, onError, autoRotate = false, sidebarOff
         })
       )
     ).then(entries => {
-      if (!ctxRef.current) return  // unmounted while loading
+      if (!ctxRef.current) return
       const textureMap = Object.fromEntries(entries.filter(([, t]) => t !== null))
-      const modelGroup = jemToScene(jem, textureMap)
+      texMapRef.current = textureMap          // save for paint patches
+      const modelGroup  = jemToScene(jem, textureMap)
 
       const box    = new THREE.Box3().setFromObject(modelGroup)
       const center = box.getCenter(new THREE.Vector3())
       modelGroup.position.x -= center.x
       modelGroup.position.z -= center.z
-      modelGroup.position.y -= box.min.y   // sit on grid
+      modelGroup.position.y -= box.min.y
       if (grid) grid.position.y = 0
 
-      // Aim orbit at the vertical centre of the model so nothing gets clipped
       const modelHeight = box.max.y - box.min.y
       controls.target.set(0, modelHeight / 2, 0)
 
-      // Fit camera only on the very first model load; leave it alone after that
       if (ctx.firstLoad) {
         const size = box.getSize(new THREE.Vector3()).length()
-        camera.position.set(size * 0.8 * fitScaleRef.current, size * 0.6 * fitScaleRef.current, size * 1.2 * fitScaleRef.current)
+        camera.position.set(
+          size * 0.8 * fitScaleRef.current,
+          size * 0.6 * fitScaleRef.current,
+          size * 1.2 * fitScaleRef.current,
+        )
         controls.update()
         ctx.firstLoad = false
       }
@@ -158,7 +222,7 @@ export default function CemViewer({ jem, onError, autoRotate = false, sidebarOff
   return (
     <div
       ref={mountRef}
-      style={{ width: '100%', height: '100%', display: 'block', cursor: 'grab' }}
+      style={{ width: '100%', height: '100%', display: 'block', cursor: enablePaint ? 'crosshair' : 'grab' }}
     />
   )
 }
