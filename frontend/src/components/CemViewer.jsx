@@ -22,6 +22,8 @@ const CemViewer = forwardRef(function CemViewer({
   enablePaint = false, onPaintUV = null, texturePatch = null, paintTexPath = null,
   // restore camera from a prior session
   initialCamera = null,
+  // view cube gizmo
+  showNavCube = false,
 }, ref) {
   const mountRef       = useRef(null)
   const ctxRef         = useRef(null)
@@ -167,11 +169,86 @@ const CemViewer = forwardRef(function CemViewer({
       mouseDownPos = null
     })
 
+    // ── Nav cube gizmo ────────────────────────────────────────────────────
+    let gizmoRenderer = null, gizmoScene = null, gizmoCamera = null, gizmoCube = null, gizmoFaceDefs = null
+    const GIZMO_SIZE = 100
+    if (showNavCube) {
+      gizmoRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+      gizmoRenderer.setSize(GIZMO_SIZE, GIZMO_SIZE)
+      gizmoRenderer.setPixelRatio(window.devicePixelRatio)
+      Object.assign(gizmoRenderer.domElement.style, {
+        position: 'absolute', bottom: '10px', right: '10px',
+        cursor: 'pointer', borderRadius: '4px', pointerEvents: 'auto',
+      })
+      mount.appendChild(gizmoRenderer.domElement)
+
+      gizmoScene = new THREE.Scene()
+      gizmoCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100)
+      gizmoCamera.position.set(0, 0, 2.5)
+
+      function makeFaceTex(label, bg) {
+        const c = document.createElement('canvas')
+        c.width = 128; c.height = 128
+        const cx = c.getContext('2d')
+        cx.fillStyle = bg
+        cx.fillRect(0, 0, 128, 128)
+        cx.strokeStyle = 'rgba(0,0,0,0.55)'
+        cx.lineWidth = 6
+        cx.strokeRect(3, 3, 122, 122)
+        cx.fillStyle = '#fff'
+        cx.font = 'bold 26px monospace'
+        cx.textAlign = 'center'
+        cx.textBaseline = 'middle'
+        cx.fillText(label, 64, 64)
+        return new THREE.CanvasTexture(c)
+      }
+
+      // BoxGeometry face order: +X, -X, +Y, -Y, +Z, -Z
+      gizmoFaceDefs = [
+        { label: 'Right', bg: '#c44', dir: new THREE.Vector3( 1,  0,  0) },
+        { label: 'Left',  bg: '#833', dir: new THREE.Vector3(-1,  0,  0) },
+        { label: 'Top',   bg: '#4a4', dir: new THREE.Vector3( 0,  1,  0) },
+        { label: 'Bot',   bg: '#273', dir: new THREE.Vector3( 0, -1,  0) },
+        { label: 'Front', bg: '#48c', dir: new THREE.Vector3( 0,  0,  1) },
+        { label: 'Back',  bg: '#357', dir: new THREE.Vector3( 0,  0, -1) },
+      ]
+
+      const cubeMats = gizmoFaceDefs.map(f => new THREE.MeshBasicMaterial({ map: makeFaceTex(f.label, f.bg) }))
+      gizmoCube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), cubeMats)
+      gizmoScene.add(gizmoCube)
+
+      const edgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.01, 1.01, 1.01))
+      gizmoCube.add(new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({ color: 0x000000 })))
+
+      const gizmoRay = new THREE.Raycaster()
+      gizmoRenderer.domElement.addEventListener('click', e => {
+        const rect = gizmoRenderer.domElement.getBoundingClientRect()
+        const mx = ((e.clientX - rect.left) / GIZMO_SIZE) * 2 - 1
+        const my = -((e.clientY - rect.top)  / GIZMO_SIZE) * 2 + 1
+        gizmoRay.setFromCamera(new THREE.Vector2(mx, my), gizmoCamera)
+        const hits = gizmoRay.intersectObject(gizmoCube)
+        if (!hits.length) return
+        const fi = Math.floor(hits[0].faceIndex / 2)
+        const dir = gizmoFaceDefs[fi].dir
+        const dist = camera.position.distanceTo(controls.target)
+        camera.position.copy(controls.target).addScaledVector(dir, dist)
+        camera.lookAt(controls.target)
+        controls.update()
+      })
+    }
+
     let animId
     function animate() {
       animId = requestAnimationFrame(animate)
       controls.update()
       renderer.render(scene, camera)
+      if (gizmoRenderer && gizmoCamera && gizmoCube) {
+        const dir = camera.position.clone().sub(controls.target).normalize()
+        gizmoCamera.position.copy(dir.multiplyScalar(2.5))
+        gizmoCamera.up.copy(camera.up)
+        gizmoCamera.lookAt(0, 0, 0)
+        gizmoRenderer.render(gizmoScene, gizmoCamera)
+      }
     }
     animate()
 
@@ -210,6 +287,10 @@ const CemViewer = forwardRef(function CemViewer({
       el.removeEventListener('dblclick',   onDblClick)
       el.removeEventListener('mouseleave', onUp)
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement)
+      if (gizmoRenderer) {
+        gizmoRenderer.dispose()
+        if (mount.contains(gizmoRenderer.domElement)) mount.removeChild(gizmoRenderer.domElement)
+      }
       ctxRef.current = null
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -307,7 +388,7 @@ const CemViewer = forwardRef(function CemViewer({
   return (
     <div
       ref={mountRef}
-      style={{ width: '100%', height: '100%', display: 'block', cursor: enablePaint ? 'crosshair' : 'grab' }}
+      style={{ width: '100%', height: '100%', display: 'block', position: 'relative', cursor: enablePaint ? 'crosshair' : 'grab' }}
     />
   )
 })

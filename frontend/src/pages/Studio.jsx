@@ -1173,7 +1173,7 @@ export default function Studio() {
         <div style={{ ...s.centerPanel, position: 'relative' }}>
           {centerJem
             ? <CemViewer ref={viewerRef} jem={editTab === 'modeler' ? null : (partEditMode ? centerJem : viewerJem)} onError={()=>{}} showGrid={showGrid} showAxes={false} bgColor={bg}
-                initialCamera={initialCamera}
+                initialCamera={initialCamera} showNavCube
                 enablePaint={editTab !== 'modeler' && !!texPath && tool !== 'drag'} onPaintUV={onPaintUV} texturePatch={texturePatch} paintTexPath={texPath} />
             : <div style={{ color:'var(--clr-text-dim)', padding:'2rem', fontSize:'0.9rem' }}>Select a body to preview.</div>}
           {/* Viewer toggle bar */}
