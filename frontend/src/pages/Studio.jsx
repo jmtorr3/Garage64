@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import CemViewer from '../components/CemViewer'
+import TexToolbox from '../components/TexToolbox'
 import Modeler from './Modeler'
 import { useTheme } from '../ThemeContext'
 
@@ -13,7 +14,6 @@ import { useTheme } from '../ThemeContext'
 // ── constants ─────────────────────────────────────────────────────────────────
 
 const ZOOM_LEVELS = [2, 4, 6, 8, 12, 16, 24, 32]
-const LOSPEC500 = ['#10121c','#2c1e31','#6b2643','#ac2847','#ec273f','#94493a','#de5d3a','#e98537','#f3a833','#4d3533','#6e4c30','#a26d3f','#ce9248','#dab163','#e8d282','#f7f3b7','#1e4044','#006554','#26854c','#5ab552','#9de64e','#008b8b','#62a477','#a6cb96','#d3eed3','#3e3b65','#3859b3','#3388de','#36c5f4','#6dead6','#5e5b8c','#8c78a5','#b0a7b8','#deceed','#9a4d76','#c878af','#cc99ff','#fa6e79','#ffa2ac','#ffd1d5','#f6e8e0','#ffffff']
 
 // ── styles ────────────────────────────────────────────────────────────────────
 
@@ -219,7 +219,7 @@ export default function Studio() {
   const [showSaveAs,   setShowSaveAs]   = useState(false)
   const [saveAsPath,   setSaveAsPath]   = useState('')
   const [zoom,         setZoom]         = useState(2)
-  const [tool,         setTool]         = useState('pencil')
+  const [tool,         setTool]         = useState('drag')
   const [color,        setColor]        = useState('#ff4455')
   const [alpha,        setAlpha]        = useState(255)
   const [hexInput,     setHexInput]     = useState('#ff4455')
@@ -831,7 +831,6 @@ export default function Studio() {
 
   // ── Render ────────────────────────────────────────────────────────────────────
   const texBuf = bufRef.current
-  const [cR, cG, cB] = hexToRgba(color)
 
   // ── Modeler mode ────────────────────────────────────────────────────────────
   if (modelerMode) return (
@@ -857,13 +856,28 @@ export default function Studio() {
             {texStatus && texStatus !== 'ok' && <span style={s.err}>{texStatus}</span>}
           </span>
         </div>
-        <div ref={scrollContainerRef} style={{ flex: 1, overflow: 'auto', padding: '12px', display: 'flex', alignItems: 'flex-start' }}>
-          {texPath
-            ? <canvas ref={canvasRef} style={{ display: 'block', imageRendering: 'pixelated', cursor: tool === 'drag' ? 'grab' : 'crosshair' }}
-                onMouseDown={onTexDown} onMouseMove={onTexMove} onMouseUp={onTexUp} onMouseLeave={onTexLeave} onWheel={onTexWheel} />
-            : <div style={{ color: 'var(--clr-text-dim)', fontFamily: 'Monocraft, sans-serif' }}>No texture loaded.</div>
-          }
+
+        {/* Canvas + floating toolbox */}
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          <div ref={scrollContainerRef} style={{ position: 'absolute', inset: 0, overflow: 'auto', padding: '12px', display: 'flex', alignItems: 'flex-start' }}>
+            {texPath
+              ? <canvas ref={canvasRef} style={{ display: 'block', imageRendering: 'pixelated', cursor: tool === 'drag' ? 'grab' : 'crosshair' }}
+                  onMouseDown={onTexDown} onMouseMove={onTexMove} onMouseUp={onTexUp} onMouseLeave={onTexLeave} onWheel={onTexWheel} />
+              : <div style={{ color: 'var(--clr-text-dim)', fontFamily: 'Monocraft, sans-serif' }}>No texture loaded.</div>
+            }
+          </div>
+          <TexToolbox
+            tool={tool} setTool={setTool}
+            color={color} setColor={setColor}
+            hexInput={hexInput} setHexInput={setHexInput}
+            alpha={alpha} setAlpha={setAlpha}
+            undoCount={undoCount} redoCount={redoCount}
+            texUndo={texUndo} texRedo={texRedo}
+            colorHistory={colorHistory}
+            onHexChange={onHexChange} pushHistory={pushHistory}
+          />
         </div>
+
         {/* Zoom bar */}
         <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', padding: '4px 8px', borderTop: '1px solid var(--bdr-dk)', background: 'var(--bg-panel)', flexShrink: 0 }}>
           {ZOOM_LEVELS.map(z => (
@@ -872,64 +886,9 @@ export default function Studio() {
         </div>
       </div>
 
-      {/* Right tools panel */}
-      <div style={{ width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-panel)', borderLeft: '2px solid var(--bdr-dk)' }}>
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', padding: '4px' }}>
-
-          <div style={s.section}>
-            <div style={s.secHead}>Tool</div>
-            <div style={{ ...s.secBody, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={s.toolRow}>
-                {[['pencil','✏ Pencil'],['fill','⬛ Fill'],['eraser','◻ Erase'],['eye','💉 Pick'],['drag','✥ Drag']].map(([id, label]) => (
-                  <button key={id} style={{ ...s.toolBtn, ...(tool === id ? s.toolAct : {}) }} onClick={() => setTool(id)}>{label}</button>
-                ))}
-              </div>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                <button style={{ ...s.btnSm, flex: 1, opacity: undoCount ? 1 : 0.4 }} onClick={texUndo} disabled={!undoCount}>↩ Undo</button>
-                <button style={{ ...s.btnSm, flex: 1, opacity: redoCount ? 1 : 0.4 }} onClick={texRedo} disabled={!redoCount}>↪ Redo</button>
-              </div>
-            </div>
-          </div>
-
-          <div style={s.section}>
-            <div style={s.secHead}>Color</div>
-            <div style={s.secBody}>
-              <div style={s.colorWrap}>
-                <div style={{ ...s.swatch, background: rgbaToSwatchCss(cR,cG,cB,alpha) }}
-                  onClick={() => document.getElementById('_texPicker').click()} />
-                <input id="_texPicker" type="color" value={color}
-                  style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }}
-                  onChange={e => { setColor(e.target.value); setHexInput(e.target.value) }} />
-                <input style={s.hexInput} value={hexInput} maxLength={7}
-                  onChange={e => onHexChange(e.target.value)} placeholder="#rrggbb" />
-              </div>
-              <div style={s.alphaRow}>
-                <span style={{ width: '40px', flexShrink: 0 }}>Alpha</span>
-                <input type="range" min={0} max={255} style={s.alphaSlider} value={alpha} onChange={e => setAlpha(Number(e.target.value))} />
-                <span style={{ width: '28px', textAlign: 'right', flexShrink: 0, fontSize: '0.72rem' }}>{alpha}</span>
-              </div>
-              <div style={{ marginTop: '6px', fontSize: '10px', color: 'var(--clr-text-dim)', fontFamily: 'Monocraft, sans-serif', marginBottom: '3px' }}>Lospec500</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px' }}>
-                {LOSPEC500.map(c => (
-                  <div key={c} title={c}
-                    style={{ width: '14px', height: '14px', background: c, cursor: 'pointer', outline: color === c ? '2px solid var(--clr-accent)' : '1px solid rgba(0,0,0,0.3)', flexShrink: 0 }}
-                    onClick={() => { setColor(c); setHexInput(c); pushHistory(c) }} />
-                ))}
-              </div>
-              {colorHistory.length > 0 && (
-                <>
-                  <div style={{ marginTop: '6px', fontSize: '10px', color: 'var(--clr-text-dim)', fontFamily: 'Monocraft, sans-serif', marginBottom: '3px' }}>Recent</div>
-                  <div style={s.histRow}>
-                    {colorHistory.map((c, i) => (
-                      <div key={i} style={{ ...s.histSwatch, background: c }} title={c}
-                        onClick={() => { setColor(c); setHexInput(c) }} />
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
+      {/* Right panel — variant + save only */}
+      <div style={{ width: 200, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-panel)', borderLeft: '2px solid var(--bdr-dk)' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '4px' }}>
           <div style={s.section}>
             <div style={s.secHead}>Variant Override</div>
             <div style={s.secBody}>
@@ -941,15 +900,12 @@ export default function Studio() {
               </select>
             </div>
           </div>
-
         </div>
         <div style={{ padding: '8px', borderTop: '2px solid var(--bdr-dk)', display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            <button style={s.btn} onClick={texSave}>Save PNG</button>
-            <button style={s.btn} onClick={texSaveAs}>Save As</button>
-            <button style={{ ...s.btn, ...(texVariantId ? {} : { background: 'var(--bg-panel-alt)', color: 'var(--clr-text-dim)', cursor: 'not-allowed' }) }}
-              onClick={texSaveVariant} disabled={!texVariantId}>Save Override</button>
-          </div>
+          <button style={s.btn} onClick={texSave}>Save PNG</button>
+          <button style={s.btn} onClick={texSaveAs}>Save As</button>
+          <button style={{ ...s.btn, ...(texVariantId ? {} : { background: 'var(--bg-panel-alt)', color: 'var(--clr-text-dim)', cursor: 'not-allowed' }) }}
+            onClick={texSaveVariant} disabled={!texVariantId}>Save Override</button>
           {showSaveAs && (
             <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
               <input style={{ ...s.inputFull, flex: 1, fontSize: '10px' }}
@@ -1170,7 +1126,33 @@ export default function Studio() {
         <div style={s.divider} onMouseDown={e => { e.preventDefault(); dragRef2.current = { side:'left', startX: e.clientX, startW: leftWidth } }} />
 
         {/* ── Center: 3D viewer (always visible) ── */}
-        <div style={{ ...s.centerPanel, position: 'relative' }}>
+        <div style={{ ...s.centerPanel, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+
+          {/* Toolbox bar above viewer */}
+          {editTab !== 'modeler' && (
+            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 6px', borderBottom: '1px solid var(--bdr-dk)', background: 'var(--bg-panel)', flexWrap: 'wrap' }}>
+              {[['drag','✥'],['pencil','✏'],['fill','▦'],['eraser','◻'],['eye','⊕']].map(([id, icon]) => (
+                <button key={id} title={id} style={{ ...s.btnSm, ...(tool===id ? { background:'var(--bg-btn-active)', borderTopColor:'var(--bdr-dk)', borderLeftColor:'var(--bdr-dk)', borderRightColor:'var(--bdr-input-lt)', borderBottomColor:'var(--bdr-input-lt)' } : {}) }}
+                  onClick={() => setTool(id)}>{icon}</button>
+              ))}
+              <div style={{ width: '1px', height: '18px', background: 'var(--bdr-dk)', margin: '0 2px' }} />
+              <button title="Undo" style={{ ...s.btnSm, opacity: undoCount ? 1 : 0.4 }} onClick={texUndo} disabled={!undoCount}>↩</button>
+              <button title="Redo" style={{ ...s.btnSm, opacity: redoCount ? 1 : 0.4 }} onClick={texRedo} disabled={!redoCount}>↪</button>
+              <div style={{ width: '1px', height: '18px', background: 'var(--bdr-dk)', margin: '0 2px' }} />
+              <div title="Color" style={{ width: '22px', height: '22px', background: `rgba(${(hexInput||'#000000').replace('#','').match(/../g).map(h=>parseInt(h,16)).join(',')},${(alpha/255).toFixed(2)})`, border: '2px solid var(--bdr-dk)', cursor: 'pointer', flexShrink: 0 }}
+                onClick={() => document.getElementById('_tbCenterPicker').click()} />
+              <input id="_tbCenterPicker" type="color" value={color}
+                style={{ position:'absolute', opacity:0, pointerEvents:'none', width:0, height:0 }}
+                onChange={e => { setColor(e.target.value); setHexInput(e.target.value) }} />
+              <input style={{ ...s.input, width: '72px', fontSize: '10px' }} value={hexInput} maxLength={7}
+                onChange={e => onHexChange(e.target.value)} placeholder="#rrggbb" />
+              <input type="range" min={0} max={255} value={alpha} onChange={e => setAlpha(Number(e.target.value))}
+                style={{ width: '60px', accentColor: 'var(--clr-accent)' }} title={`Alpha: ${alpha}`} />
+            </div>
+          )}
+
+          {/* 3D viewer */}
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           {centerJem
             ? <CemViewer ref={viewerRef} jem={editTab === 'modeler' ? null : (partEditMode ? centerJem : viewerJem)} onError={()=>{}} showGrid={showGrid} showAxes={false} bgColor={bg}
                 initialCamera={initialCamera} showNavCube
@@ -1192,7 +1174,8 @@ export default function Studio() {
               style={{ ...s.btnSm, ...(showGrid ? { background:'var(--bg-btn-active)', borderTop:'1px solid var(--bdr-dk)', borderLeft:'1px solid var(--bdr-dk)', borderRight:'1px solid var(--bdr-input-lt)', borderBottom:'1px solid var(--bdr-input-lt)' } : {}) }}
               onClick={() => setShowGrid(g => !g)}>⊞ Grid</button>
           </div>
-        </div>
+          </div>{/* inner flex viewer */}
+        </div>{/* centerPanel */}
 
         {/* ── Right divider ── */}
         <div style={s.divider} onMouseDown={e => { e.preventDefault(); dragRef2.current = { side:'right', startX: e.clientX, startW: rightWidth } }} />
@@ -1251,7 +1234,7 @@ export default function Studio() {
               </div>
 
               {/* Canvas */}
-              <div ref={scrollContainerRef} style={{ overflow:'auto', maxHeight:'240px', background:'#111', border:'1px solid var(--bdr-dk)', margin:'0 4px' }}>
+              <div ref={scrollContainerRef} style={{ overflow:'auto', maxHeight:'340px', background:'#111', border:'1px solid var(--bdr-dk)', margin:'0 4px' }}>
                 {texPath
                   ? <canvas ref={canvasRef} style={{ display:'block', imageRendering:'pixelated', cursor: tool==='drag'?'grab':'crosshair' }}
                       onMouseDown={onTexDown} onMouseMove={onTexMove} onMouseUp={onTexUp} onMouseLeave={onTexLeave} />
@@ -1267,47 +1250,7 @@ export default function Studio() {
                 {hoverPixel && texBuf && <span style={{ marginLeft:'auto', fontSize:'10px', color:'var(--clr-text-dim)', fontFamily:'Monocraft, sans-serif' }}>({hoverPixel[0]},{hoverPixel[1]})</span>}
               </div>
 
-              {/* Color picker */}
-              <div style={s.section}>
-                <div style={s.secHead}>Color</div>
-                <div style={s.secBody}>
-                  <div style={s.colorWrap}>
-                    <div style={{ ...s.swatch, background: rgbaToSwatchCss(cR,cG,cB,alpha) }}
-                      onClick={() => document.getElementById('_texPickerSb').click()} />
-                    <input id="_texPickerSb" type="color" value={color}
-                      style={{ position:'absolute', opacity:0, pointerEvents:'none', width:0, height:0 }}
-                      onChange={e => { setColor(e.target.value); setHexInput(e.target.value) }} />
-                    <input style={s.hexInput} value={hexInput} maxLength={7}
-                      onChange={e => onHexChange(e.target.value)} placeholder="#rrggbb" />
-                  </div>
-                  <div style={s.alphaRow}>
-                    <span style={{ width:'40px', flexShrink:0 }}>Alpha</span>
-                    <input type="range" min={0} max={255} style={s.alphaSlider} value={alpha} onChange={e=>setAlpha(Number(e.target.value))} />
-                    <span style={{ width:'28px', textAlign:'right', flexShrink:0, fontSize:'0.72rem' }}>{alpha}</span>
-                  </div>
-                  <div style={{ marginTop:'6px', fontSize:'10px', color:'var(--clr-text-dim)', fontFamily:'Monocraft, sans-serif', marginBottom:'3px' }}>Lospec500</div>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:'2px' }}>
-                    {LOSPEC500.map(c => (
-                      <div key={c} title={c}
-                        style={{ width:'14px', height:'14px', background:c, cursor:'pointer', outline: color===c?'2px solid var(--clr-accent)':'1px solid rgba(0,0,0,0.3)', flexShrink:0 }}
-                        onClick={() => { setColor(c); setHexInput(c); pushHistory(c) }} />
-                    ))}
-                  </div>
-                  {colorHistory.length > 0 && (
-                    <>
-                      <div style={{ marginTop:'6px', fontSize:'10px', color:'var(--clr-text-dim)', fontFamily:'Monocraft, sans-serif', marginBottom:'3px' }}>Recent</div>
-                      <div style={s.histRow}>
-                        {colorHistory.map((c,i) => (
-                          <div key={i} style={{ ...s.histSwatch, background:c }} title={c}
-                            onClick={() => { setColor(c); setHexInput(c) }} />
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-{!partEditMode && <div style={s.section}>
+              {!partEditMode && <div style={s.section}>
                 <div style={s.secHead}>Variant Override</div>
                 <div style={s.secBody}>
                   <select style={s.select} value={texVariantId} onChange={e=>setTexVariantId(e.target.value)}>
@@ -1327,25 +1270,7 @@ export default function Studio() {
                 </div>
               </div>}
 
-              <div style={s.section}>
-                <div style={s.secHead}>Tool</div>
-                <div style={{ ...s.secBody, display:'flex', flexDirection:'column', gap:'4px' }}>
-                  <div style={s.toolRow}>
-                    {[['pencil','✏ Pencil'],['fill','⬛ Fill'],['eraser','◻ Erase'],['eye','💉 Pick'],['drag','✥ Drag']].map(([id,label]) => (
-                      <button key={id} style={{ ...s.toolBtn, ...(tool===id?s.toolAct:{}) }} onClick={()=>setTool(id)}>{label}</button>
-                    ))}
-                  </div>
-                  <div style={{ display:'flex', gap:'4px' }}>
-                    <button style={{ ...s.btnSm, flex:1, opacity: undoCount?1:0.4, cursor: undoCount?'pointer':'default' }}
-                      onClick={texUndo} disabled={!undoCount}>↩ Undo</button>
-                    <button style={{ ...s.btnSm, flex:1, opacity: redoCount?1:0.4, cursor: redoCount?'pointer':'default' }}
-                      onClick={texRedo} disabled={!redoCount}>↪ Redo</button>
-                  </div>
-                </div>
-              </div>
-
-
-<div style={{ display:'flex', gap:'6px', alignItems:'center', flexWrap:'wrap', padding:'0 4px 8px' }}>
+              <div style={{ display:'flex', gap:'6px', alignItems:'center', flexWrap:'wrap', padding:'0 4px 8px' }}>
                 <button style={s.btn} onClick={texSave}>Save PNG</button>
                 <button style={s.btn} onClick={texSaveAs}>Save As</button>
                 {partEditMode
@@ -1355,7 +1280,6 @@ export default function Studio() {
                       Save Override
                     </button>
                 }
-                {hoverPixel && texBuf && <span style={{ fontSize:'0.72rem', color:'var(--clr-text-dim)' }}>({hoverPixel[0]}, {hoverPixel[1]})</span>}
                 {texStatus==='ok' && <span style={s.ok}>Saved!</span>}
                 {texStatus && texStatus!=='ok' && <span style={s.err}>{texStatus}</span>}
               </div>
