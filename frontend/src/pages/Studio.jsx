@@ -3,26 +3,23 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import CemViewer from '../components/CemViewer'
-import UVCanvas from '../components/UVCanvas'
+import Modeler from './Modeler'
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
 const ZOOM_LEVELS = [2, 4, 6, 8, 12, 16, 24, 32]
-const FACE_COLORS = {
-  north: '#ff4455', south: '#44dd66', east: '#4499ff',
-  west:  '#ffcc00', up:    '#44ffdd', down: '#ff44cc',
-}
-const FACES = ['north', 'south', 'east', 'west', 'up', 'down']
+const LOSPEC500 = ['#10121c','#2c1e31','#6b2643','#ac2847','#ec273f','#94493a','#de5d3a','#e98537','#f3a833','#4d3533','#6e4c30','#a26d3f','#ce9248','#dab163','#e8d282','#f7f3b7','#1e4044','#006554','#26854c','#5ab552','#9de64e','#008b8b','#62a477','#a6cb96','#d3eed3','#3e3b65','#3859b3','#3388de','#36c5f4','#6dead6','#5e5b8c','#8c78a5','#b0a7b8','#deceed','#9a4d76','#c878af','#cc99ff','#fa6e79','#ffa2ac','#ffd1d5','#f6e8e0','#ffffff']
 
 // ── styles ────────────────────────────────────────────────────────────────────
 
 const XP_RAISED  = { borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)' }
 const XP_SUNKEN  = { borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)' }
-const XP_TITLE   = { background: 'var(--bg-title)', color: 'var(--clr-text-on-title)', padding: '2px 8px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'Tahoma,sans-serif', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--bdr-dk)' }
-const XP_BTN_SM  = { padding: '2px 8px', background: 'var(--bg-btn)', ...{ borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)' }, color: 'var(--clr-text)', cursor: 'pointer', fontSize: '11px', fontFamily: 'Tahoma,sans-serif', fontWeight: 'bold' }
-const XP_INPUT   = { padding: '3px 6px', background: 'var(--bg-input)', color: 'var(--clr-text)', ...{ borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)' }, fontFamily: 'Tahoma,sans-serif', fontSize: '11px' }
+const XP_TITLE   = { background: 'var(--bg-title)', color: 'var(--clr-text-on-title)', padding: '2px 8px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'Monocraft, sans-serif', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--bdr-dk)' }
+const XP_BTN_SM  = { padding: '2px 8px', background: 'var(--bg-btn)', ...{ borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)' }, color: 'var(--clr-text)', cursor: 'pointer', fontSize: '11px', fontFamily: 'Monocraft, sans-serif', fontWeight: 'bold' }
+const XP_INPUT   = { padding: '3px 6px', background: 'var(--bg-input)', color: 'var(--clr-text)', ...{ borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)' }, fontFamily: 'Monocraft, sans-serif', fontSize: '11px' }
 
 const s = {
   page:        { display: 'flex', flexDirection: 'column', height: 'calc(100vh - 48px)', background: 'var(--bg-window)', margin: '-1.5rem -2rem', overflow: 'hidden' },
@@ -36,7 +33,7 @@ const s = {
   rightPanelTex: { flex: 1, overflow: 'auto', padding: '1rem', background: '#1a1a1a', minHeight: 0 },
   rightPanelDivH:{ height: '4px', flexShrink: 0, background: 'var(--bdr-dk)' },
   tabBar:      { display: 'flex', gap: '2px', background: 'var(--bg-panel)', borderBottom: '2px solid var(--bdr-dk)', padding: '4px 4px 0', flexShrink: 0 },
-  tab:         { flex: 1, padding: '3px 0', textAlign: 'center', borderRadius: '3px 3px 0 0', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: '1px solid var(--bdr-dk)', borderBottom: 'none', fontFamily: 'Tahoma,sans-serif', background: 'var(--bg-panel-alt)', color: 'var(--clr-text-dim)' },
+  tab:         { flex: 1, padding: '3px 0', textAlign: 'center', borderRadius: '3px 3px 0 0', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: '1px solid var(--bdr-dk)', borderBottom: 'none', fontFamily: 'Monocraft, sans-serif', background: 'var(--bg-panel-alt)', color: 'var(--clr-text-dim)' },
   tabContent:  { flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', background: 'var(--bg-panel)', padding: '4px', borderTop: 'none', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)' },
   saveBar:     { flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '4px', padding: '6px', borderTop: '2px solid var(--bdr-dk)', background: 'var(--bg-panel)' },
   section:     { background: 'var(--bg-window)', overflow: 'hidden', flexShrink: 0, ...XP_RAISED },
@@ -44,40 +41,40 @@ const s = {
   secBody:     { padding: '6px 8px' },
   select:      { ...XP_INPUT, width: '100%', boxSizing: 'border-box' },
   selectSm:    { ...XP_INPUT },
-  label:       { color: 'var(--clr-text-dim)', fontSize: '11px', fontFamily: 'Tahoma,sans-serif' },
+  label:       { color: 'var(--clr-text-dim)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
   input:       { ...XP_INPUT },
   inputFull:   { ...XP_INPUT, width: '100%', boxSizing: 'border-box' },
-  btn:         { padding: '4px 16px', background: 'var(--bg-btn-primary)', borderTop: '2px solid var(--bdr-btn-primary-lt)', borderLeft: '2px solid var(--bdr-btn-primary-lt)', borderRight: '2px solid var(--bdr-btn-primary-dk)', borderBottom: '2px solid var(--bdr-btn-primary-dk)', color: '#fff', fontFamily: 'Tahoma,sans-serif', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' },
+  btn:         { padding: '4px 16px', background: 'var(--bg-btn-primary)', borderTop: '2px solid var(--bdr-btn-primary-lt)', borderLeft: '2px solid var(--bdr-btn-primary-lt)', borderRight: '2px solid var(--bdr-btn-primary-dk)', borderBottom: '2px solid var(--bdr-btn-primary-dk)', color: '#fff', fontFamily: 'Monocraft, sans-serif', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' },
   btnSm:       XP_BTN_SM,
-  badge:       { display: 'inline-block', background: 'var(--clr-badge-bg)', border: '1px solid var(--clr-badge-border)', color: 'var(--clr-badge-text)', padding: '1px 5px', fontSize: '10px', fontFamily: 'Tahoma,sans-serif', marginRight: 3 },
-  ok:          { color: 'var(--clr-ok)', fontSize: '11px', fontFamily: 'Tahoma,sans-serif' },
-  err:         { color: 'var(--clr-err)', fontSize: '11px', fontFamily: 'Tahoma,sans-serif' },
+  badge:       { display: 'inline-block', background: 'var(--clr-badge-bg)', border: '1px solid var(--clr-badge-border)', color: 'var(--clr-badge-text)', padding: '1px 5px', fontSize: '10px', fontFamily: 'Monocraft, sans-serif', marginRight: 3 },
+  ok:          { color: 'var(--clr-ok)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
+  err:         { color: 'var(--clr-err)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
   // compose
   slotBox:     { background: 'var(--bg-window)', overflow: 'hidden', flexShrink: 0, ...XP_RAISED },
   slotHeader:  { display: 'flex', alignItems: 'center', padding: '2px 8px', ...XP_TITLE, textTransform: 'uppercase' },
-  slotTitle:   { flex: 1, fontSize: '11px', fontWeight: 'bold', color: 'var(--clr-text-on-title)', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'Tahoma,sans-serif' },
+  slotTitle:   { flex: 1, fontSize: '11px', fontWeight: 'bold', color: 'var(--clr-text-on-title)', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'Monocraft, sans-serif' },
   slotBody:    { padding: '4px 8px' },
   miniViewer:  { height: '90px', background: '#1a1a2e', position: 'relative', overflow: 'hidden', flexShrink: 0 },
   slotNav:     { display: 'flex', alignItems: 'center', gap: '3px', padding: '3px 4px', borderTop: '1px solid var(--bdr-dk)', flexShrink: 0 },
-  slotNavBtn:  { padding: '1px 7px', background: 'var(--bg-btn)', borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', cursor: 'pointer', fontSize: '10px', fontFamily: 'Tahoma,sans-serif', flexShrink: 0 },
-  partLabel:   { flex: 1, textAlign: 'center', fontSize: '10px', fontFamily: 'Tahoma,sans-serif', color: 'var(--clr-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 },
+  slotNavBtn:  { padding: '1px 7px', background: 'var(--bg-btn)', borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', cursor: 'pointer', fontSize: '10px', fontFamily: 'Monocraft, sans-serif', flexShrink: 0 },
+  partLabel:   { flex: 1, textAlign: 'center', fontSize: '10px', fontFamily: 'Monocraft, sans-serif', color: 'var(--clr-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 },
   radioRow:    { display: 'flex', alignItems: 'center', gap: '6px', padding: '2px 0', cursor: 'pointer', userSelect: 'none', justifyContent: 'space-between' },
   editBtns:    { display: 'flex', gap: '2px', flexShrink: 0 },
-  editBtn:     { padding: '1px 5px', background: 'var(--bg-btn)', borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', cursor: 'pointer', fontSize: '9px', fontFamily: 'Tahoma,sans-serif', fontWeight: 'bold' },
-  radioActive: { fontSize: '11px', color: 'var(--clr-text)', fontFamily: 'Tahoma,sans-serif' },
-  radioInact:  { fontSize: '11px', color: 'var(--clr-text-dim)', fontFamily: 'Tahoma,sans-serif' },
-  emptySlot:   { fontSize: '11px', color: 'var(--clr-text-dim)', padding: '3px 0', fontFamily: 'Tahoma,sans-serif' },
+  editBtn:     { padding: '1px 5px', background: 'var(--bg-btn)', borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', cursor: 'pointer', fontSize: '9px', fontFamily: 'Monocraft, sans-serif', fontWeight: 'bold' },
+  radioActive: { fontSize: '11px', color: 'var(--clr-text)', fontFamily: 'Monocraft, sans-serif' },
+  radioInact:  { fontSize: '11px', color: 'var(--clr-text-dim)', fontFamily: 'Monocraft, sans-serif' },
+  emptySlot:   { fontSize: '11px', color: 'var(--clr-text-dim)', padding: '3px 0', fontFamily: 'Monocraft, sans-serif' },
   addSlotRow:  { display: 'flex', gap: '4px', alignItems: 'center' },
   manageBox:   { background: 'var(--bg-panel)', padding: '6px', marginTop: '4px', borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-lt)', borderBottom: '2px solid var(--bdr-lt)' },
-  manageTitle: { fontSize: '10px', color: 'var(--clr-text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px', fontFamily: 'Tahoma,sans-serif' },
+  manageTitle: { fontSize: '10px', color: 'var(--clr-text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px', fontFamily: 'Monocraft, sans-serif' },
   slotRow:     { display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' },
   // uv
-  treeItem:    { padding: '2px 4px', cursor: 'pointer', fontSize: '11px', userSelect: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'Tahoma,sans-serif' },
+  treeItem:    { padding: '2px 4px', cursor: 'pointer', fontSize: '11px', userSelect: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'Monocraft, sans-serif' },
   faceRow:     { display: 'flex', alignItems: 'center', gap: '6px', padding: '2px 0', fontSize: '11px' },
   dot:         { width: '10px', height: '10px', flexShrink: 0 },
   numInput:    { width: '46px', ...XP_INPUT },
   offsetRow:   { display: 'flex', gap: '6px', alignItems: 'center', padding: '3px 0', fontSize: '11px' },
-  offsetLabel: { color: 'var(--clr-text-dim)', width: '14px', textAlign: 'right', fontSize: '10px', fontFamily: 'Tahoma,sans-serif' },
+  offsetLabel: { color: 'var(--clr-text-dim)', width: '14px', textAlign: 'right', fontSize: '10px', fontFamily: 'Monocraft, sans-serif' },
   // texture
   toolRow:     { display: 'flex', gap: '4px', flexWrap: 'wrap' },
   toolBtn:     { ...XP_BTN_SM, padding: '4px 8px' },
@@ -85,50 +82,14 @@ const s = {
   colorWrap:   { display: 'flex', gap: '8px', alignItems: 'center' },
   swatch:      { width: '32px', height: '32px', ...XP_SUNKEN, cursor: 'pointer', flexShrink: 0 },
   hexInput:    { ...XP_INPUT, flex: 1 },
-  alphaRow:    { display: 'flex', gap: '6px', alignItems: 'center', marginTop: '4px', fontSize: '11px', color: 'var(--clr-text-dim)', fontFamily: 'Tahoma,sans-serif' },
+  alphaRow:    { display: 'flex', gap: '6px', alignItems: 'center', marginTop: '4px', fontSize: '11px', color: 'var(--clr-text-dim)', fontFamily: 'Monocraft, sans-serif' },
   alphaSlider: { flex: 1, accentColor: 'var(--clr-accent)' },
   zoomRow:     { display: 'flex', gap: '3px', flexWrap: 'wrap' },
   zoomBtn:     { ...XP_BTN_SM, padding: '2px 5px', fontSize: '10px' },
   zoomAct:     { background: 'var(--bg-btn-active)', borderTop: '1px solid var(--bdr-dk)', borderLeft: '1px solid var(--bdr-dk)', borderRight: '1px solid var(--bdr-input-lt)', borderBottom: '1px solid var(--bdr-input-lt)', color: 'var(--clr-text)', fontWeight: 'bold' },
   histRow:     { display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px' },
   histSwatch:  { width: '18px', height: '18px', ...XP_SUNKEN, cursor: 'pointer', flexShrink: 0 },
-  canvasWrap:  { imageRendering: 'pixelated', cursor: 'crosshair', display: 'inline-block' },
-  infoRow:     { fontSize: '10px', color: 'var(--clr-text-dim)', marginTop: '4px', fontFamily: 'Tahoma,sans-serif' },
-}
-
-// ── UV helpers ────────────────────────────────────────────────────────────────
-
-function collectBoxes(model, prefix = '') {
-  const results = []
-  const label = prefix || model.id || model.part || 'root'
-  if (model.boxes) {
-    model.boxes.forEach((box, i) => results.push({ path: `${label}/box${i}`, box }))
-  }
-  if (model.submodels) {
-    model.submodels.forEach((sub, i) => results.push(...collectBoxes(sub, `${label}/sub${i}`)))
-  }
-  return results
-}
-
-function applyBoxPatch(model, segs, depth, newBox) {
-  const seg = segs[depth]
-  if (!seg) return
-  const bm = seg.match(/^box(\d+)$/)
-  const sm = seg.match(/^sub(\d+)$/)
-  if (bm && depth === segs.length - 1) { model.boxes[+bm[1]] = newBox; return }
-  if (sm) applyBoxPatch(model.submodels[+sm[1]], segs, depth + 1, newBox)
-}
-
-function setBoxInPartData(data, path, newBox) {
-  const clone = JSON.parse(JSON.stringify(data))
-  applyBoxPatch(clone, path.split('/'), 1, newBox)
-  return clone
-}
-
-function setBoxInBodyData(bodyData, modelIdx, path, newBox) {
-  const clone = JSON.parse(JSON.stringify(bodyData))
-  applyBoxPatch(clone.models[modelIdx], path.split('/'), 1, newBox)
-  return clone
+  infoRow:     { fontSize: '10px', color: 'var(--clr-text-dim)', marginTop: '4px', fontFamily: 'Monocraft, sans-serif' },
 }
 
 // ── Texture helpers ───────────────────────────────────────────────────────────
@@ -189,7 +150,10 @@ function partToMiniJem(part) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Studio() {
-  const [tab, setTab] = useState('compose')
+  const [searchParams] = useSearchParams()
+
+  const [texEditorMode, setTexEditorMode] = useState(false)
+  const [modelerMode, setModelerMode] = useState(null) // null | { partId, bodyId }
 
   // Shared data
   const [bodies, setBodies] = useState([])
@@ -212,27 +176,16 @@ export default function Studio() {
   const dragRef2 = useRef(null) // { side:'left'|'right', startX, startW }
 
   // ── UV ────────────────────────────────────────────────────────────────────────
-  const [uvSrc,       setUvSrc]       = useState('part')
+  const [editTab,     setEditTab]     = useState('body')    // 'body' | 'part'
   const [uvPartId,    setUvPartId]    = useState(null)
-  const [partData,    setPartData]    = useState(null)
-  const [origPartData,setOrigPartData]= useState(null)
-  const [attachMeta,  setAttachMeta]  = useState(null)
   const [bodyData,    setBodyData]    = useState(null)
-  const [origBodyData,setOrigBodyData]= useState(null)
-  const [bodyModelIdx,setBodyModelIdx]= useState(0)
-  const [uvBoxes,     setUvBoxes]     = useState([])
-  const [uvBoxIdx,    setUvBoxIdx]    = useState(0)
-  const [selFace,     setSelFace]     = useState(null)
-  const [uvImg,       setUvImg]       = useState(null)
-  const [uvTexSize,   setUvTexSize]   = useState([64,32])
-  const [uvStatus,    setUvStatus]    = useState('')
 
   // ── Texture ───────────────────────────────────────────────────────────────────
   const [variants,     setVariants]     = useState([])
-  const [texPartId,    setTexPartId]    = useState('')
+  const [texPartId,    setTexPartId]    = useState('__body__')
   const [texVariantId, setTexVariantId] = useState('')
   const [texPath,      setTexPath]      = useState('')
-  const [zoom,         setZoom]         = useState(8)
+  const [zoom,         setZoom]         = useState(2)
   const [tool,         setTool]         = useState('pencil')
   const [color,        setColor]        = useState('#ff4455')
   const [alpha,        setAlpha]        = useState(255)
@@ -243,13 +196,43 @@ export default function Studio() {
   const canvasRef  = useRef(null)
   const bufRef     = useRef(null)
   const drawingRef = useRef(false)
+  const undoRef    = useRef([])
+  const redoRef    = useRef([])
+  const [undoCount, setUndoCount] = useState(0)
+  const [redoCount, setRedoCount] = useState(0)
+  const texUndoRef        = useRef(null)
+  const texRedoRef        = useRef(null)
+  const scrollContainerRef = useRef(null)
+  const pendingScrollRef   = useRef(null)
+  const dragStartRef       = useRef(null) // { mouseX, mouseY, scrollLeft, scrollTop }
 
   // ── Load on mount ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    api.getBodies().then(bs => { setBodies(bs); if (bs.length) setBodyId(bs[0].id) })
+    const variantId = searchParams.get('variantId')
+    api.getBodies().then(bs => {
+      setBodies(bs)
+      if (variantId) {
+        api.getVariant(Number(variantId)).then(v => {
+          const match = bs.find(b => b.name === v.body_name)
+          if (match) setBodyId(match.id)
+          else if (bs.length) setBodyId(bs[0].id)
+          // pre-select parts from the variant
+          const newSlotSel = {}
+          const newExtraSel = new Set()
+          for (const vp of (v.variant_parts || [])) {
+            if (vp.part.slot) newSlotSel[vp.part.slot] = vp.part.id
+            else newExtraSel.add(vp.part.id)
+          }
+          setSlotSel(newSlotSel)
+          setExtraSel(newExtraSel)
+        }).catch(() => { if (bs.length) setBodyId(bs[0].id) })
+      } else if (bs.length) {
+        setBodyId(bs[0].id)
+      }
+    })
     api.getParts().then(ps => {
       setParts(ps)
-      if (ps.length) { setUvPartId(ps[0].id); setTexPartId(String(ps[0].id)) }
+      if (ps.length) { setUvPartId(ps[0].id) }
     })
     api.getSlots().then(setSlots)
     api.getVariants().then(setVariants)
@@ -282,111 +265,33 @@ export default function Studio() {
     return buildVirtualJem(currentBody.body_data, activeParts)
   }, [currentBody, activeParts])
 
+  const bodyMiniJem = useMemo(() => {
+    if (!currentBody) return null
+    return buildVirtualJem(currentBody.body_data, [])
+  }, [currentBody])
+
   // ── Dirty tracking ────────────────────────────────────────────────────────────
-  const [uvDirty,  setUvDirty]  = useState(false)
   const [texDirty, setTexDirty] = useState(false)
-  const isDirty = uvDirty || texDirty
+  const isDirty = texDirty
 
-  // ── UV effects ────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!uvPartId || uvSrc !== 'part') return
-    api.getPart(uvPartId).then(p => {
-      setPartData(p.part_data); setOrigPartData(p.part_data)
-      setAttachMeta(p.attachment_meta); setUvStatus(''); setSelFace(null)
-    })
-  }, [uvPartId, uvSrc])
-
+  // ── UV/body effects ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (!bodyId) return
-    api.getBody(bodyId).then(b => {
-      setBodyData(b.body_data); setOrigBodyData(b.body_data); setBodyModelIdx(0)
-    })
+    api.getBody(bodyId).then(b => { setBodyData(b.body_data) })
   }, [bodyId])
 
-  useEffect(() => { setUvBoxIdx(0); setSelFace(null) }, [uvSrc, bodyModelIdx])
-
-  const uvActiveModel = uvSrc === 'part' ? partData : (bodyData?.models?.[bodyModelIdx] ?? null)
-
+  // Sync texPartId and zoom when tab or uvPartId changes
   useEffect(() => {
-    if (!uvActiveModel) { setUvBoxes([]); return }
-    const list = collectBoxes(uvActiveModel)
-    setUvBoxes(list)
-    setUvBoxIdx(i => Math.min(i, Math.max(0, list.length - 1)))
-  }, [uvActiveModel])
-
-  useEffect(() => {
-    let tp, declaredSize
-    if (uvSrc === 'part') {
-      if (!attachMeta) return
-      tp = attachMeta.textureFile || attachMeta.texture
-      if (!tp) return
+    if (editTab === 'body') {
+      setTexPartId('__body__'); setZoom(2)
     } else {
-      if (!bodyData) return
-      const m = bodyData.models?.[bodyModelIdx]
-      tp = m?.texture || bodyData.texture
-      declaredSize = m?.textureSize || bodyData.textureSize
-      if (!tp) return
+      // Only use uvPartId if it's actually an active part; otherwise default to first active part
+      const validId = activeParts.find(p => p.id === uvPartId)?.id ?? activeParts[0]?.id ?? null
+      if (validId) { setUvPartId(validId); setTexPartId(String(validId)) }
+      else { setTexPartId('') }
     }
-    const norm = tp.replace(/^minecraft:/, '')
-    const image = new Image()
-    image.onload = () => { setUvImg(image); setUvTexSize(declaredSize || [image.naturalWidth, image.naturalHeight]) }
-    image.src = `/api/asset/?path=${encodeURIComponent(norm)}`
-  }, [uvSrc, attachMeta, bodyData, bodyModelIdx])
+  }, [editTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── UV logic ──────────────────────────────────────────────────────────────────
-  const uvBox = uvBoxes[uvBoxIdx]?.box || null
-
-  function uvHandleBoxChange(updatedBox) {
-    const entry = uvBoxes[uvBoxIdx]
-    if (!entry) return
-    if (uvSrc === 'part' && partData)
-      setPartData(setBoxInPartData(partData, entry.path, updatedBox))
-    else if (uvSrc === 'body' && bodyData)
-      setBodyData(setBoxInBodyData(bodyData, bodyModelIdx, entry.path, updatedBox))
-    setUvDirty(true)
-  }
-
-  function getUvFaceCoords() {
-    if (!uvBox || !selFace || uvBox.textureOffset) return null
-    return uvBox['uv' + selFace[0].toUpperCase() + selFace.slice(1)] || null
-  }
-
-  function setUvFaceCoord(ci, val) {
-    if (!uvBox || !selFace) return
-    const key = 'uv' + selFace[0].toUpperCase() + selFace.slice(1)
-    const next = [...(uvBox[key] || [0,0,0,0])]; next[ci] = Number(val)
-    uvHandleBoxChange({ ...uvBox, [key]: next })
-  }
-
-  function setUvOffset(axis, val) {
-    if (!uvBox) return
-    const [u, v] = uvBox.textureOffset || [0,0]
-    uvHandleBoxChange({ ...uvBox, textureOffset: axis === 0 ? [Number(val), v] : [u, Number(val)] })
-  }
-
-  async function uvSave() {
-    setUvStatus('')
-    try {
-      if (uvSrc === 'part') {
-        const p = parts.find(x => x.id === uvPartId)
-        await api.updatePart(uvPartId, { name: p.name, jpm_path: p.jpm_path, slot: p.slot || '', part_data: partData, attachment_meta: attachMeta })
-        setOrigPartData(partData)
-      } else {
-        await api.patchBody(bodyId, { body_data: bodyData })
-        setOrigBodyData(bodyData)
-      }
-      setUvStatus('ok'); setUvDirty(false)
-    } catch (e) { setUvStatus(e.message) }
-  }
-
-  function uvRevert() {
-    if (uvSrc === 'part') setPartData(origPartData)
-    else setBodyData(origBodyData)
-    setUvStatus(''); setUvDirty(false)
-  }
-
-  const uvFaceCoords = getUvFaceCoords()
-  const bodyModels = bodyData?.models || []
 
   // ── Texture effects ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -402,20 +307,26 @@ export default function Studio() {
   }, [texPartId, parts, bodyData])
 
   useEffect(() => {
+    bufRef.current = null; redraw()  // clear old texture immediately
     if (!texPath) return
     const img = new Image()
     img.onload = () => {
       const buf = document.createElement('canvas')
       buf.width = img.naturalWidth; buf.height = img.naturalHeight
       buf.getContext('2d').drawImage(img, 0, 0)
-      bufRef.current = buf; redraw(); setTexStatus('')
+      bufRef.current = buf
+      undoRef.current = []; redoRef.current = []
+      setUndoCount(0); setRedoCount(0)
+      // auto-zoom: fit texture width inside the 340px panel
+      const ideal = 340 / img.naturalWidth
+      const autoZoom = [...ZOOM_LEVELS].reverse().find(z => z <= ideal) ?? ZOOM_LEVELS[0]
+      setZoom(autoZoom)
+      redraw(); setTexStatus('')
     }
     img.onerror = () => setTexStatus(`Could not load: ${texPath}`)
     img.src = `/api/asset/?path=${encodeURIComponent(texPath)}`
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [texPath])
-
-  useEffect(() => { redraw() }, [zoom])
 
   // ── Texture logic ─────────────────────────────────────────────────────────────
   const redraw = useCallback(() => {
@@ -437,9 +348,22 @@ export default function Studio() {
     }
   }, [zoom])
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    redraw()
+    if (pendingScrollRef.current) {
+      const { container, left, top } = pendingScrollRef.current
+      container.scrollLeft = left
+      container.scrollTop  = top
+      pendingScrollRef.current = null
+    }
+  }, [zoom])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { redraw() }, [texEditorMode])
+
   function toPixel(e) {
     const r = canvasRef.current.getBoundingClientRect()
-    return [Math.floor((e.clientX-r.left)/zoom), Math.floor((e.clientY-r.top)/zoom)]
+    return [Math.floor((e.clientX - r.left) / zoom), Math.floor((e.clientY - r.top) / zoom)]
   }
 
   function paintPixel(px, py) {
@@ -453,6 +377,8 @@ export default function Studio() {
       const imgData = ctx.getImageData(0,0,buf.width,buf.height)
       const [r,g,b] = hexToRgba(color); floodFill(imgData,px,py,r,g,b,alpha)
       ctx.putImageData(imgData,0,0); redraw(); setTexDirty(true)
+    } else if (tool === 'eraser') {
+      ctx.clearRect(px, py, 1, 1); redraw(); setTexDirty(true)
     } else if (tool === 'eye') {
       const d = ctx.getImageData(px,py,1,1).data
       const hex = rgbaToHex(d[0],d[1],d[2])
@@ -464,10 +390,93 @@ export default function Studio() {
     setColorHistory(h => [hex, ...h.filter(c => c !== hex)].slice(0,20))
   }
 
-  function onTexDown(e)  { drawingRef.current=true; if(tool==='pencil') pushHistory(color); paintPixel(...toPixel(e)) }
-  function onTexMove(e)  { const [px,py]=toPixel(e); setHoverPixel([px,py]); if(drawingRef.current&&tool==='pencil') paintPixel(px,py) }
-  function onTexUp()     { drawingRef.current=false }
-  function onTexLeave()  { drawingRef.current=false; setHoverPixel(null) }
+  function saveTexUndoState() {
+    const buf = bufRef.current
+    if (!buf) return
+    const ctx = buf.getContext('2d')
+    undoRef.current.push(ctx.getImageData(0, 0, buf.width, buf.height))
+    if (undoRef.current.length > 50) undoRef.current.shift()
+    redoRef.current = []
+    setUndoCount(undoRef.current.length)
+    setRedoCount(0)
+  }
+
+  function texUndo() {
+    if (!undoRef.current.length || !bufRef.current) return
+    const buf = bufRef.current
+    const ctx = buf.getContext('2d')
+    const prev = undoRef.current.pop()
+    redoRef.current.push(ctx.getImageData(0, 0, buf.width, buf.height))
+    ctx.putImageData(prev, 0, 0)
+    redraw(); setTexDirty(true)
+    setUndoCount(undoRef.current.length)
+    setRedoCount(redoRef.current.length)
+  }
+
+  function texRedo() {
+    if (!redoRef.current.length || !bufRef.current) return
+    const buf = bufRef.current
+    const ctx = buf.getContext('2d')
+    const next = redoRef.current.pop()
+    undoRef.current.push(ctx.getImageData(0, 0, buf.width, buf.height))
+    ctx.putImageData(next, 0, 0)
+    redraw(); setTexDirty(true)
+    setUndoCount(undoRef.current.length)
+    setRedoCount(redoRef.current.length)
+  }
+
+  texUndoRef.current = texUndo
+  texRedoRef.current = texRedo
+
+  function onTexDown(e) {
+    drawingRef.current = true
+    if (tool === 'drag') {
+      const c = scrollContainerRef.current
+      dragStartRef.current = { mouseX: e.clientX, mouseY: e.clientY, scrollLeft: c?.scrollLeft ?? 0, scrollTop: c?.scrollTop ?? 0 }
+      return
+    }
+    if (tool === 'pencil' || tool === 'fill' || tool === 'eraser') saveTexUndoState()
+    if (tool === 'pencil') pushHistory(color)
+    paintPixel(...toPixel(e))
+  }
+  function onTexMove(e) {
+    const [px, py] = toPixel(e)
+    setHoverPixel([px, py])
+    if (!drawingRef.current) return
+    if (tool === 'drag') {
+      const c = scrollContainerRef.current
+      const d = dragStartRef.current
+      if (c && d) { c.scrollLeft = d.scrollLeft - (e.clientX - d.mouseX); c.scrollTop = d.scrollTop - (e.clientY - d.mouseY) }
+      return
+    }
+    if (tool === 'pencil' || tool === 'eraser') paintPixel(px, py)
+  }
+  function onTexUp()    { drawingRef.current = false; dragStartRef.current = null }
+  function onTexLeave() { drawingRef.current = false; dragStartRef.current = null; setHoverPixel(null) }
+  function onTexWheel(e) {
+    e.preventDefault()
+    const idx = ZOOM_LEVELS.indexOf(zoom)
+    const newIdx = e.deltaY < 0 ? Math.min(idx + 1, ZOOM_LEVELS.length - 1) : Math.max(idx - 1, 0)
+    if (newIdx === idx) return
+    const newZoom = ZOOM_LEVELS[newIdx]
+    // Compute scroll so the pixel under cursor stays fixed
+    const canvas = canvasRef.current
+    const container = scrollContainerRef.current
+    if (canvas && container) {
+      const cr = canvas.getBoundingClientRect()
+      const tr = container.getBoundingClientRect()
+      const px = (e.clientX - cr.left) / zoom
+      const py = (e.clientY - cr.top)  / zoom
+      const canvasLeft = cr.left - tr.left + container.scrollLeft
+      const canvasTop  = cr.top  - tr.top  + container.scrollTop
+      pendingScrollRef.current = {
+        container,
+        left: canvasLeft + px * newZoom - (e.clientX - tr.left),
+        top:  canvasTop  + py * newZoom - (e.clientY - tr.top),
+      }
+    }
+    setZoom(newZoom)
+  }
 
   const bodyVariants = useMemo(() =>
     variants.filter(v => currentBody && v.body_name === currentBody.name),
@@ -505,13 +514,16 @@ export default function Studio() {
   }
 
   // ── Compose logic ─────────────────────────────────────────────────────────────
-  function pickSlot(slotName, partId) {
-    setSlotSel(prev => ({ ...prev, [slotName]: prev[slotName]===partId ? null : partId }))
-  }
+
   function stepSlotPart(slotName, dir) {
     const opts = [null, ...(partsBySlot[slotName] || []).map(p => p.id)]
     const idx = opts.indexOf(slotSel[slotName] || null)
     setSlotSel(prev => ({ ...prev, [slotName]: opts[(idx + dir + opts.length) % opts.length] }))
+  }
+  function stepBody(dir) {
+    if (!bodies.length) return
+    const idx = bodies.findIndex(b => b.id === bodyId)
+    setBodyId(bodies[(idx + dir + bodies.length) % bodies.length].id)
   }
   function toggleExtra(partId) {
     setExtraSel(prev => { const n=new Set(prev); n.has(partId)?n.delete(partId):n.add(partId); return n })
@@ -551,6 +563,17 @@ export default function Studio() {
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
+  }, [])
+
+  // ── Undo/redo keyboard shortcuts ──────────────────────────────────────────────
+  useEffect(() => {
+    function onKey(e) {
+      if (!(e.ctrlKey || e.metaKey)) return
+      if (!e.shiftKey && e.key === 'z') { e.preventDefault(); texUndoRef.current?.() }
+      if (e.key === 'y' || (e.shiftKey && e.key === 'Z')) { e.preventDefault(); texRedoRef.current?.() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
   // ── Leave guard ───────────────────────────────────────────────────────────────
@@ -597,6 +620,125 @@ export default function Studio() {
   const texBuf = bufRef.current
   const [cR, cG, cB] = hexToRgba(color)
 
+  // ── Modeler mode ────────────────────────────────────────────────────────────
+  if (modelerMode) return (
+    <Modeler
+      partId={modelerMode.partId}
+      bodyId={modelerMode.bodyId}
+      onBack={() => setModelerMode(null)}
+    />
+  )
+
+  // ── Texture editor full-screen mode ────────────────────────────────────────
+  if (texEditorMode) return (
+    <div style={{ ...s.page, flexDirection: 'row' }}>
+      {/* Large canvas area */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#1a1a1a', position: 'relative' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 8px', flexShrink: 0, borderBottom: '2px solid var(--bdr-dk)', background: 'var(--bg-panel)' }}>
+          <button style={s.btnSm} onClick={() => setTexEditorMode(false)}>← Back to Studio</button>
+          <span style={{ ...s.label, marginLeft: '8px' }}>{texPath || '—'}</span>
+          {texBuf && <span style={s.infoRow}>{texBuf.width} × {texBuf.height} px</span>}
+          <span style={{ marginLeft: 'auto', display: 'flex', gap: '4px', alignItems: 'center' }}>
+            {hoverPixel && texBuf && <span style={{ fontSize: '10px', color: 'var(--clr-text-dim)', fontFamily: 'Monocraft, sans-serif' }}>({hoverPixel[0]}, {hoverPixel[1]})</span>}
+            {texStatus === 'ok' && <span style={s.ok}>Saved!</span>}
+            {texStatus && texStatus !== 'ok' && <span style={s.err}>{texStatus}</span>}
+          </span>
+        </div>
+        <div ref={scrollContainerRef} style={{ flex: 1, overflow: 'auto', padding: '12px', display: 'flex', alignItems: 'flex-start' }}>
+          {texPath
+            ? <canvas ref={canvasRef} style={{ display: 'block', imageRendering: 'pixelated', cursor: tool === 'drag' ? 'grab' : 'crosshair' }}
+                onMouseDown={onTexDown} onMouseMove={onTexMove} onMouseUp={onTexUp} onMouseLeave={onTexLeave} onWheel={onTexWheel} />
+            : <div style={{ color: 'var(--clr-text-dim)', fontFamily: 'Monocraft, sans-serif' }}>No texture loaded.</div>
+          }
+        </div>
+        {/* Zoom bar */}
+        <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', padding: '4px 8px', borderTop: '1px solid var(--bdr-dk)', background: 'var(--bg-panel)', flexShrink: 0 }}>
+          {ZOOM_LEVELS.map(z => (
+            <button key={z} style={{ ...s.zoomBtn, ...(zoom === z ? s.zoomAct : {}) }} onClick={() => setZoom(z)}>{z}×</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Right tools panel */}
+      <div style={{ width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-panel)', borderLeft: '2px solid var(--bdr-dk)' }}>
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', padding: '4px' }}>
+
+          <div style={s.section}>
+            <div style={s.secHead}>Tool</div>
+            <div style={{ ...s.secBody, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={s.toolRow}>
+                {[['pencil','✏ Pencil'],['fill','⬛ Fill'],['eraser','◻ Erase'],['eye','💉 Pick'],['drag','✥ Drag']].map(([id, label]) => (
+                  <button key={id} style={{ ...s.toolBtn, ...(tool === id ? s.toolAct : {}) }} onClick={() => setTool(id)}>{label}</button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button style={{ ...s.btnSm, flex: 1, opacity: undoCount ? 1 : 0.4 }} onClick={texUndo} disabled={!undoCount}>↩ Undo</button>
+                <button style={{ ...s.btnSm, flex: 1, opacity: redoCount ? 1 : 0.4 }} onClick={texRedo} disabled={!redoCount}>↪ Redo</button>
+              </div>
+            </div>
+          </div>
+
+          <div style={s.section}>
+            <div style={s.secHead}>Color</div>
+            <div style={s.secBody}>
+              <div style={s.colorWrap}>
+                <div style={{ ...s.swatch, background: rgbaToSwatchCss(cR,cG,cB,alpha) }}
+                  onClick={() => document.getElementById('_texPicker').click()} />
+                <input id="_texPicker" type="color" value={color}
+                  style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }}
+                  onChange={e => { setColor(e.target.value); setHexInput(e.target.value) }} />
+                <input style={s.hexInput} value={hexInput} maxLength={7}
+                  onChange={e => onHexChange(e.target.value)} placeholder="#rrggbb" />
+              </div>
+              <div style={s.alphaRow}>
+                <span style={{ width: '40px', flexShrink: 0 }}>Alpha</span>
+                <input type="range" min={0} max={255} style={s.alphaSlider} value={alpha} onChange={e => setAlpha(Number(e.target.value))} />
+                <span style={{ width: '28px', textAlign: 'right', flexShrink: 0, fontSize: '0.72rem' }}>{alpha}</span>
+              </div>
+              <div style={{ marginTop: '6px', fontSize: '10px', color: 'var(--clr-text-dim)', fontFamily: 'Monocraft, sans-serif', marginBottom: '3px' }}>Lospec500</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px' }}>
+                {LOSPEC500.map(c => (
+                  <div key={c} title={c}
+                    style={{ width: '14px', height: '14px', background: c, cursor: 'pointer', outline: color === c ? '2px solid var(--clr-accent)' : '1px solid rgba(0,0,0,0.3)', flexShrink: 0 }}
+                    onClick={() => { setColor(c); setHexInput(c); pushHistory(c) }} />
+                ))}
+              </div>
+              {colorHistory.length > 0 && (
+                <>
+                  <div style={{ marginTop: '6px', fontSize: '10px', color: 'var(--clr-text-dim)', fontFamily: 'Monocraft, sans-serif', marginBottom: '3px' }}>Recent</div>
+                  <div style={s.histRow}>
+                    {colorHistory.map((c, i) => (
+                      <div key={i} style={{ ...s.histSwatch, background: c }} title={c}
+                        onClick={() => { setColor(c); setHexInput(c) }} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div style={s.section}>
+            <div style={s.secHead}>Variant Override</div>
+            <div style={s.secBody}>
+              <select style={s.select} value={texVariantId} onChange={e => setTexVariantId(e.target.value)}>
+                <option value="">— none —</option>
+                {bodyVariants.map(v => (
+                  <option key={v.id} value={v.id}>{v.file_name}{v.texture_override ? ' ✓' : ''}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+        </div>
+        <div style={{ padding: '8px', borderTop: '2px solid var(--bdr-dk)', display: 'flex', gap: '6px', flexWrap: 'wrap', flexShrink: 0 }}>
+          <button style={s.btn} onClick={texSave}>Save PNG</button>
+          <button style={{ ...s.btn, ...(texVariantId ? {} : { background: 'var(--bg-panel-alt)', color: 'var(--clr-text-dim)', cursor: 'not-allowed' }) }}
+            onClick={texSaveVariant} disabled={!texVariantId}>Save Override</button>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <div style={s.page}>
 
@@ -609,224 +751,258 @@ export default function Studio() {
         <span style={{ marginLeft: 'auto' }}>
           {activeParts.length
             ? activeParts.map(p => <span key={p.id} style={s.badge}>+{p.name}</span>)
-            : <span style={{ color:'var(--clr-text-dim)', fontSize:'11px', fontFamily:'Tahoma,sans-serif' }}>no parts selected</span>}
+            : <span style={{ color:'var(--clr-text-dim)', fontSize:'11px', fontFamily:'Monocraft, sans-serif' }}>no parts selected</span>}
         </span>
       </div>
 
       {/* Content */}
       <div style={s.content}>
 
-        {/* ── Left panel ── */}
+        {/* ── Left panel — always Compose ── */}
         <div style={{ ...s.sidebar, width: leftWidth }}>
+          <div style={XP_TITLE}>Compose</div>
 
-          {/* Tab bar */}
-          <div style={s.tabBar}>
-            {[['compose','Compose'],['edit','Edit']].map(([id,label]) => {
-              const dirty = (id==='edit'&&(uvDirty||texDirty))
-              return (
-                <button key={id} style={{ ...s.tab, background: tab===id ? 'var(--bg-window)':'var(--bg-panel-alt)', color: tab===id ? 'var(--clr-text)':'var(--clr-text-dim)', fontWeight: tab===id ? 'bold':'normal' }}
-                  onClick={() => setTab(id)}>{label}{dirty ? ' *' : ''}</button>
-              )
-            })}
-          </div>
-
-          {/* Tab content */}
           <div style={s.tabContent}>
 
-            {/* ══ COMPOSE ══ */}
-            {tab === 'compose' && <>
-              {slots.map(slot => {
-                const slotParts = partsBySlot[slot.name] || []
-                const selected  = slotSel[slot.name] || null
-                const selPart   = slotParts.find(p => p.id === selected) || null
-                const miniJem   = selPart ? partToMiniJem(selPart) : null
-                return (
-                  <div key={slot.id} style={s.slotBox}>
-                    <div style={s.slotHeader}><span style={s.slotTitle}>{slot.display_name}</span></div>
-
-                    {/* Mini JPM viewer */}
-                    <div style={s.miniViewer}>
-                      {miniJem
-                        ? <CemViewer jem={miniJem} onError={()=>{}} autoRotate sidebarOffset={0} showGrid={false} showAxes={false} fitScale={0.55} enableZoom={false} />
-                        : <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.25)', fontSize:'10px', fontFamily:'Tahoma,sans-serif' }}>none</div>
-                      }
-                    </div>
-
-                    {/* Prev / part name / Next + edit buttons */}
-                    <div style={s.slotNav}>
-                      <button style={s.slotNavBtn} onClick={() => stepSlotPart(slot.name, -1)}>◀</button>
-                      <span style={s.partLabel}>{selPart?.name ?? '(none)'}</span>
-                      {selPart && (
-                        <div style={s.editBtns}>
-                          <button style={s.editBtn} title="Edit UV" onClick={() => { setTab('edit'); setUvSrc('part'); setUvPartId(selPart.id) }}>UV</button>
-                          <button style={s.editBtn} title="Edit texture" onClick={() => { setTab('edit'); setTexPartId(String(selPart.id)) }}>Tex</button>
-                        </div>
-                      )}
-                      <button style={s.slotNavBtn} onClick={() => stepSlotPart(slot.name, 1)}>▶</button>
-                    </div>
-
-                    {slotParts.length === 0 && (
-                      <div style={{ ...s.emptySlot, padding:'4px 8px' }}>No parts in slot.</div>
-                    )}
-                  </div>
-                )
-              })}
-
-              {standaloneParts.length > 0 && (
-                <div style={s.slotBox}>
-                  <div style={s.slotHeader}><span style={s.slotTitle}>Extras</span></div>
-                  <div style={s.slotBody}>
-                    {standaloneParts.map(p => (
-                      <div key={p.id} style={s.radioRow}>
-                        <div style={{ display:'flex', alignItems:'center', gap:'6px', flex:1, cursor:'pointer' }}
-                          onClick={() => toggleExtra(p.id)}>
-                          <input type="checkbox" readOnly checked={extraSel.has(p.id)} />
-                          <span style={extraSel.has(p.id) ? s.radioActive : s.radioInact}>{p.name}</span>
-                        </div>
-                        <div style={s.editBtns} onClick={e => e.stopPropagation()}>
-                          <button style={s.editBtn} title="Edit UV" onClick={() => { setTab('edit'); setUvSrc('part'); setUvPartId(p.id) }}>UV</button>
-                          <button style={s.editBtn} title="Edit texture" onClick={() => { setTab('edit'); setTexPartId(String(p.id)) }}>Tex</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+            {/* Body box */}
+            <div style={s.slotBox}>
+              <div style={s.slotHeader}><span style={s.slotTitle}>Body</span></div>
+              <div style={s.miniViewer}>
+                {bodyMiniJem
+                  ? <CemViewer jem={bodyMiniJem} onError={()=>{}} autoRotate sidebarOffset={0} showGrid={false} showAxes={false} fitScale={0.55} enableZoom={false} />
+                  : <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.25)', fontSize:'10px', fontFamily:'Monocraft, sans-serif' }}>no body</div>
+                }
+              </div>
+              <div style={s.slotNav}>
+                <button style={s.slotNavBtn} onClick={() => stepBody(-1)}>◀</button>
+                <span style={s.partLabel}>{currentBody?.name ?? '—'}</span>
+                <div style={s.editBtns}>
+                  <button style={s.editBtn} title="Edit UV" onClick={() => setEditTab('body')}>UV</button>
+                  <button style={s.editBtn} title="Edit texture" onClick={() => setEditTab('body')}>Tex</button>
                 </div>
-              )}
+                <button style={s.slotNavBtn} onClick={() => stepBody(1)}>▶</button>
+              </div>
+            </div>
 
-              <div>
-                <button style={s.btnSm} onClick={() => setShowManage(v=>!v)}>
-                  {showManage ? '▲ hide' : '▼ manage slots'}
-                </button>
-                {showManage && (
-                  <div style={s.manageBox}>
-                    <div style={s.manageTitle}>Slots</div>
-                    {slots.map(sl => (
-                      <div key={sl.id} style={s.slotRow}>
-                        <span style={{ fontSize:'11px', flex:1, color:'var(--clr-text)', fontFamily:'Tahoma,sans-serif' }}>
-                          <span style={{ color:'var(--clr-accent)', fontWeight:'bold' }}>{sl.display_name}</span>
-                          <span style={{ color:'var(--clr-text-dim)' }}> · {sl.name}</span>
-                        </span>
-                        <button style={s.btnSm} onClick={() => deleteSlot(sl.id)}>✕</button>
-                      </div>
-                    ))}
-                    <div style={{ marginTop:'8px', fontSize:'0.72rem', color:'var(--clr-text-dim)', marginBottom:'4px' }}>Add slot</div>
-                    <div style={s.addSlotRow}>
-                      <input style={{ ...s.input, width:'60px' }} placeholder="name" value={newSlot.name} onChange={e=>setNewSlot(n=>({...n,name:e.target.value}))} />
-                      <input style={{ ...s.input, flex:1 }} placeholder="Display" value={newSlot.display_name} onChange={e=>setNewSlot(n=>({...n,display_name:e.target.value}))} />
-                      <input style={{ ...s.input, width:'30px' }} type="number" placeholder="#" value={newSlot.order} onChange={e=>setNewSlot(n=>({...n,order:e.target.value}))} />
-                      <button style={s.btnSm} onClick={addSlot}>+</button>
-                    </div>
-                    {slotStatus && <div style={s.err}>{slotStatus}</div>}
+            {slots.map(slot => {
+              const slotParts = partsBySlot[slot.name] || []
+              const selected  = slotSel[slot.name] || null
+              const selPart   = slotParts.find(p => p.id === selected) || null
+              const miniJem   = selPart ? partToMiniJem(selPart) : null
+              return (
+                <div key={slot.id} style={s.slotBox}>
+                  <div style={s.slotHeader}><span style={s.slotTitle}>{slot.display_name}</span></div>
+                  <div style={s.miniViewer}>
+                    {miniJem
+                      ? <CemViewer jem={miniJem} onError={()=>{}} autoRotate sidebarOffset={0} showGrid={false} showAxes={false} fitScale={0.55} enableZoom={false} />
+                      : <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.25)', fontSize:'10px', fontFamily:'Monocraft, sans-serif' }}>Create New Part</div>
+                    }
                   </div>
-                )}
-              </div>
-            </>}
-
-            {/* ══ EDIT (UV + Texture) ══ */}
-            {tab === 'edit' && <>
-              <div style={{ ...s.secHead, marginBottom:'2px', fontSize:'10px', letterSpacing:'0.08em' }}>UV EDITOR</div>
-              {/* Source toggle */}
-              <div style={{ ...s.tabBar, margin: 0 }}>
-                {[['part','Part (JPM)'],['body','Body (JEM)']].map(([src,label]) => (
-                  <button key={src} style={{ ...s.tab, background: uvSrc===src?'var(--clr-accent)':'var(--bg-panel-alt)', color: uvSrc===src?'#fff':'var(--clr-text-dim)' }}
-                    onClick={() => setUvSrc(src)}>{label}</button>
-                ))}
-              </div>
-
-              <div style={s.section}>
-                <div style={s.secHead}>{uvSrc==='part' ? 'Part' : 'Model entry'}</div>
-                <div style={s.secBody}>
-                  {uvSrc === 'part' ? (
-                    <select style={s.select} value={uvPartId??''} onChange={e => setUvPartId(Number(e.target.value))}>
-                      {parts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                  ) : (
-                    <select style={s.select} value={bodyModelIdx} onChange={e => setBodyModelIdx(Number(e.target.value))}>
-                      {bodyModels.map((m,i) => <option key={i} value={i}>{m.id||m.part||`model ${i}`}</option>)}
-                    </select>
+                  <div style={s.slotNav}>
+                    <button style={s.slotNavBtn} onClick={() => stepSlotPart(slot.name, -1)}>◀</button>
+                    <span style={s.partLabel}>{selPart?.name ?? 'Create New Part'}</span>
+                    {selPart && (
+                      <div style={s.editBtns}>
+                        <button style={s.editBtn} title="Edit UV" onClick={() => { setEditTab('part'); setUvPartId(selPart.id) }}>UV</button>
+                        <button style={s.editBtn} title="Edit texture" onClick={() => { setEditTab('part'); setUvPartId(selPart.id) }}>Tex</button>
+                      </div>
+                    )}
+                    <button style={s.slotNavBtn} onClick={() => stepSlotPart(slot.name, 1)}>▶</button>
+                  </div>
+                  {slotParts.length === 0 && (
+                    <div style={{ ...s.emptySlot, padding:'4px 8px' }}>No parts in slot.</div>
                   )}
                 </div>
-              </div>
+              )
+            })}
 
-              <div style={s.section}>
-                <div style={s.secHead}>Boxes ({uvBoxes.length})</div>
-                <div style={{ ...s.secBody, maxHeight:'180px', overflowY:'auto' }}>
-                  {uvBoxes.length === 0
-                    ? <span style={{ color:'var(--clr-text-dim)', fontSize:'0.8rem' }}>No boxes</span>
-                    : uvBoxes.map((entry, i) => (
-                        <div key={entry.path} style={{ ...s.treeItem, background: i===uvBoxIdx?'var(--clr-accent)':'transparent', color: i===uvBoxIdx?'#fff':'var(--clr-text-dim)' }}
-                          onClick={() => { setUvBoxIdx(i); setSelFace(null) }} title={entry.path}>
-                          {entry.path}
-                        </div>
-                      ))
-                  }
-                </div>
-              </div>
-
-              <div style={s.section}>
-                <div style={s.secHead}>Faces</div>
-                <div style={s.secBody}>
-                  {FACES.map(face => (
-                    <div key={face} style={{ ...s.faceRow, cursor:'pointer', opacity: uvBox?1:0.3, background: selFace===face?'var(--clr-accent)':'transparent', borderRadius:'2px', padding:'2px 4px' }}
-                      onClick={() => uvBox && setSelFace(face)}>
-                      <div style={{ ...s.dot, background: FACE_COLORS[face] }} />
-                      <span style={{ color: selFace===face?'#fff':'var(--clr-text-dim)', flex:1, fontSize:'11px', fontFamily:'Tahoma,sans-serif' }}>{face.toUpperCase()}</span>
+            {standaloneParts.length > 0 && (
+              <div style={s.slotBox}>
+                <div style={s.slotHeader}><span style={s.slotTitle}>Extras</span></div>
+                <div style={s.slotBody}>
+                  {standaloneParts.map(p => (
+                    <div key={p.id} style={s.radioRow}>
+                      <div style={{ display:'flex', alignItems:'center', gap:'6px', flex:1, cursor:'pointer' }}
+                        onClick={() => toggleExtra(p.id)}>
+                        <input type="checkbox" readOnly checked={extraSel.has(p.id)} />
+                        <span style={extraSel.has(p.id) ? s.radioActive : s.radioInact}>{p.name}</span>
+                      </div>
+                      <div style={s.editBtns} onClick={e => e.stopPropagation()}>
+                        <button style={s.editBtn} title="Edit UV" onClick={() => { setEditTab('part'); setUvPartId(p.id) }}>UV</button>
+                        <button style={s.editBtn} title="Edit texture" onClick={() => { setEditTab('part'); setUvPartId(p.id) }}>Tex</button>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
+            )}
 
-              {uvBox && (
-                <div style={s.section}>
-                  <div style={s.secHead}>{uvBox.textureOffset ? 'Texture Offset' : `UV — ${selFace||'select face'}`}</div>
-                  <div style={s.secBody}>
-                    {uvBox.textureOffset ? (
-                      <>
-                        {[['U',0],['V',1]].map(([lbl,axis]) => (
-                          <div key={lbl} style={s.offsetRow}>
-                            <span style={s.offsetLabel}>{lbl}</span>
-                            <input type="number" style={s.numInput} value={uvBox.textureOffset[axis]} onChange={e=>setUvOffset(axis,e.target.value)} />
-                          </div>
-                        ))}
-                        <div style={{ fontSize:'0.7rem', color:'var(--clr-text-dim)', marginTop:'4px' }}>Drag any face to move offset.</div>
-                      </>
-                    ) : uvFaceCoords ? (
-                      ['x1','y1','x2','y2'].map((lbl,ci) => (
-                        <div key={lbl} style={s.offsetRow}>
-                          <span style={s.offsetLabel}>{lbl}</span>
-                          <input type="number" style={s.numInput} value={uvFaceCoords[ci]} onChange={e=>setUvFaceCoord(ci,e.target.value)} />
-                        </div>
-                      ))
-                    ) : (
-                      <span style={{ color:'var(--clr-text-dim)', fontSize:'0.8rem' }}>Select a face.</span>
-                    )}
+            <div>
+              <button style={s.btnSm} onClick={() => setShowManage(v=>!v)}>
+                {showManage ? '▲ hide' : '▼ manage slots'}
+              </button>
+              {showManage && (
+                <div style={s.manageBox}>
+                  <div style={s.manageTitle}>Slots</div>
+                  {slots.map(sl => (
+                    <div key={sl.id} style={s.slotRow}>
+                      <span style={{ fontSize:'11px', flex:1, color:'var(--clr-text)', fontFamily:'Monocraft, sans-serif' }}>
+                        <span style={{ color:'var(--clr-accent)', fontWeight:'bold' }}>{sl.display_name}</span>
+                        <span style={{ color:'var(--clr-text-dim)' }}> · {sl.name}</span>
+                      </span>
+                      <button style={s.btnSm} onClick={() => deleteSlot(sl.id)}>✕</button>
+                    </div>
+                  ))}
+                  <div style={{ marginTop:'8px', fontSize:'0.72rem', color:'var(--clr-text-dim)', marginBottom:'4px' }}>Add slot</div>
+                  <div style={s.addSlotRow}>
+                    <input style={{ ...s.input, width:'60px' }} placeholder="name" value={newSlot.name} onChange={e=>setNewSlot(n=>({...n,name:e.target.value}))} />
+                    <input style={{ ...s.input, flex:1 }} placeholder="Display" value={newSlot.display_name} onChange={e=>setNewSlot(n=>({...n,display_name:e.target.value}))} />
+                    <input style={{ ...s.input, width:'30px' }} type="number" placeholder="#" value={newSlot.order} onChange={e=>setNewSlot(n=>({...n,order:e.target.value}))} />
+                    <button style={s.btnSm} onClick={addSlot}>+</button>
                   </div>
+                  {slotStatus && <div style={s.err}>{slotStatus}</div>}
                 </div>
               )}
+            </div>
 
-              <div style={{ display:'flex', gap:'6px', alignItems:'center' }}>
-                <button style={s.btn} onClick={uvSave}>Save UV</button>
-                <button style={s.btnSm} onClick={uvRevert}>Revert</button>
-                {uvStatus==='ok' && <span style={s.ok}>Saved!</span>}
-                {uvStatus && uvStatus!=='ok' && <span style={s.err}>{uvStatus}</span>}
+          </div>{/* tabContent */}
+
+          {/* Save bar */}
+          <div style={s.saveBar}>
+            <span style={s.label}>Save as variant</span>
+            <input style={s.inputFull} placeholder="file_name e.g. oak_boat4"
+              value={saveForm.file_name} onChange={e=>setSaveForm(f=>({...f,file_name:e.target.value}))} />
+            <input style={s.inputFull} placeholder="trigger e.g. Duce"
+              value={saveForm.trigger_name} onChange={e=>setSaveForm(f=>({...f,trigger_name:e.target.value}))} />
+            <div style={{ display:'flex', gap:'6px', alignItems:'center' }}>
+              <span style={s.label}>Order</span>
+              <input style={{ ...s.input, width:'50px' }} type="number"
+                value={saveForm.order} onChange={e=>setSaveForm(f=>({...f,order:Number(e.target.value)}))} />
+            </div>
+            <button style={s.btn} onClick={saveVariant}>Save Variant</button>
+            {saveStatus==='ok' && <span style={s.ok}>Saved!</span>}
+            {saveStatus && saveStatus!=='ok' && <span style={s.err}>{saveStatus}</span>}
+          </div>
+        </div>{/* left panel */}
+
+        {/* ── Left divider ── */}
+        <div style={s.divider} onMouseDown={e => { e.preventDefault(); dragRef2.current = { side:'left', startX: e.clientX, startW: leftWidth } }} />
+
+        {/* ── Center: 3D viewer + floating canvas panel ── */}
+        <div style={s.centerPanel}>
+          {jem
+            ? <CemViewer jem={jem} onError={()=>{}} />
+            : <div style={{ color:'var(--clr-text-dim)', padding:'2rem', fontSize:'0.9rem' }}>Select a body to preview.</div>}
+
+        </div>
+
+        {/* ── Right divider ── */}
+        <div style={s.divider} onMouseDown={e => { e.preventDefault(); dragRef2.current = { side:'right', startX: e.clientX, startW: rightWidth } }} />
+
+        {/* ── Right panel — Body / Part tabs ── */}
+        <div style={{ ...s.rightPanelEdit, width: rightWidth }}>
+
+          {/* Tab bar */}
+          <div style={s.tabBar}>
+            {[['body','Body'],['part','Part']].map(([tab,label]) => (
+              <button key={tab}
+                style={{ ...s.tab, background: editTab===tab?'var(--clr-accent)':'var(--bg-panel-alt)', color: editTab===tab?'#fff':'var(--clr-text-dim)' }}
+                onClick={() => setEditTab(tab)}>{label}</button>
+            ))}
+          </div>
+
+          {/* Scrollable content under the active tab */}
+          <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'0', background:'var(--bg-panel)', minHeight:0 }}>
+
+            {/* Part / model selector */}
+            <div style={{ padding:'4px 6px', display:'flex', gap:'4px', alignItems:'center', borderBottom:'1px solid var(--bdr-dk)', flexShrink:0 }}>
+              {editTab === 'part' ? (
+                <select style={{ ...s.select, flex:1 }} value={uvPartId??''} onChange={e => { const id = Number(e.target.value); setUvPartId(id); setTexPartId(String(id)) }}>
+                  {activeParts.length === 0
+                    ? <option value="">— choose part in Compose —</option>
+                    : activeParts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)
+                  }
+                </select>
+              ) : (
+                <span style={{ ...s.label, flex:1, padding:'3px 6px' }}>{currentBody?.name ?? '—'}</span>
+              )}
+            </div>
+
+            {/* ── TEXTURE PAINTER ── */}
+            <div style={{ ...XP_TITLE, flexShrink:0 }}>Texture Painter{texDirty ? ' *' : ''}</div>
+            <div style={{ padding:'4px', display:'flex', flexDirection:'column', gap:'4px' }}>
+
+              {/* Fullscreen button */}
+              <div style={{ display:'flex', padding:'2px 4px' }}>
+                <button style={{ ...s.btnSm, marginLeft:'auto' }} onClick={() => setTexEditorMode(true)}>⛶ Full Editor</button>
               </div>
 
-              <div style={{ height:'1px', background:'var(--bdr-dk)', margin:'6px 0', flexShrink:0 }} />
-              <div style={{ ...s.secHead, marginBottom:'2px', fontSize:'10px', letterSpacing:'0.08em' }}>TEXTURE PAINTER</div>
+              {/* Texture path + dimensions */}
+              <div style={{ padding:'0 4px', display:'flex', flexDirection:'column', gap:'3px' }}>
+                <input style={{ ...s.inputFull, fontSize:'10px' }}
+                  value={texPath} onChange={e => setTexPath(e.target.value)}
+                  placeholder="textures/entity/..." />
+                {texBuf && <div style={s.infoRow}>{texBuf.width} × {texBuf.height} px</div>}
+              </div>
+
+              {/* Canvas */}
+              <div ref={scrollContainerRef} style={{ overflow:'auto', maxHeight:'240px', background:'#111', border:'1px solid var(--bdr-dk)', margin:'0 4px' }}>
+                {texPath
+                  ? <canvas ref={canvasRef} style={{ display:'block', imageRendering:'pixelated', cursor: tool==='drag'?'grab':'crosshair' }}
+                      onMouseDown={onTexDown} onMouseMove={onTexMove} onMouseUp={onTexUp} onMouseLeave={onTexLeave} />
+                  : <div style={{ padding:'8px', color:'var(--clr-text-dim)', fontSize:'11px', fontFamily:'Monocraft, sans-serif' }}>No texture loaded.</div>
+                }
+              </div>
+
+              {/* Zoom */}
+              <div style={{ ...s.zoomRow, padding:'0 4px' }}>
+                {ZOOM_LEVELS.map(z => (
+                  <button key={z} style={{ ...s.zoomBtn, ...(zoom===z?s.zoomAct:{}) }} onClick={()=>setZoom(z)}>{z}×</button>
+                ))}
+                {hoverPixel && texBuf && <span style={{ marginLeft:'auto', fontSize:'10px', color:'var(--clr-text-dim)', fontFamily:'Monocraft, sans-serif' }}>({hoverPixel[0]},{hoverPixel[1]})</span>}
+              </div>
+
+              {/* Color picker */}
               <div style={s.section}>
-                <div style={s.secHead}>Source</div>
+                <div style={s.secHead}>Color</div>
                 <div style={s.secBody}>
-                  <select style={s.select} value={texPartId} onChange={e=>setTexPartId(e.target.value)}>
-                    {parts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    <option value="__body__">Body texture</option>
-                  </select>
-                  <input style={{ ...s.inputFull, marginTop:'4px' }} value={texPath}
-                    onChange={e=>setTexPath(e.target.value)} placeholder="textures/entity/..." />
-                  {texBuf && <div style={s.infoRow}>{texBuf.width} × {texBuf.height} px</div>}
+                  <div style={s.colorWrap}>
+                    <div style={{ ...s.swatch, background: rgbaToSwatchCss(cR,cG,cB,alpha) }}
+                      onClick={() => document.getElementById('_texPickerSb').click()} />
+                    <input id="_texPickerSb" type="color" value={color}
+                      style={{ position:'absolute', opacity:0, pointerEvents:'none', width:0, height:0 }}
+                      onChange={e => { setColor(e.target.value); setHexInput(e.target.value) }} />
+                    <input style={s.hexInput} value={hexInput} maxLength={7}
+                      onChange={e => onHexChange(e.target.value)} placeholder="#rrggbb" />
+                  </div>
+                  <div style={s.alphaRow}>
+                    <span style={{ width:'40px', flexShrink:0 }}>Alpha</span>
+                    <input type="range" min={0} max={255} style={s.alphaSlider} value={alpha} onChange={e=>setAlpha(Number(e.target.value))} />
+                    <span style={{ width:'28px', textAlign:'right', flexShrink:0, fontSize:'0.72rem' }}>{alpha}</span>
+                  </div>
+                  <div style={{ marginTop:'6px', fontSize:'10px', color:'var(--clr-text-dim)', fontFamily:'Monocraft, sans-serif', marginBottom:'3px' }}>Lospec500</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:'2px' }}>
+                    {LOSPEC500.map(c => (
+                      <div key={c} title={c}
+                        style={{ width:'14px', height:'14px', background:c, cursor:'pointer', outline: color===c?'2px solid var(--clr-accent)':'1px solid rgba(0,0,0,0.3)', flexShrink:0 }}
+                        onClick={() => { setColor(c); setHexInput(c); pushHistory(c) }} />
+                    ))}
+                  </div>
+                  {colorHistory.length > 0 && (
+                    <>
+                      <div style={{ marginTop:'6px', fontSize:'10px', color:'var(--clr-text-dim)', fontFamily:'Monocraft, sans-serif', marginBottom:'3px' }}>Recent</div>
+                      <div style={s.histRow}>
+                        {colorHistory.map((c,i) => (
+                          <div key={i} style={{ ...s.histSwatch, background:c }} title={c}
+                            onClick={() => { setColor(c); setHexInput(c) }} />
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
-              <div style={s.section}>
+<div style={s.section}>
                 <div style={s.secHead}>Variant Override</div>
                 <div style={s.secBody}>
                   <select style={s.select} value={texVariantId} onChange={e=>setTexVariantId(e.target.value)}>
@@ -848,51 +1024,23 @@ export default function Studio() {
 
               <div style={s.section}>
                 <div style={s.secHead}>Tool</div>
-                <div style={{ ...s.secBody, ...s.toolRow }}>
-                  {[['pencil','✏ Pencil'],['fill','⬛ Fill'],['eye','💉 Pick']].map(([id,label]) => (
-                    <button key={id} style={{ ...s.toolBtn, ...(tool===id?s.toolAct:{}) }} onClick={()=>setTool(id)}>{label}</button>
-                  ))}
-                </div>
-              </div>
-
-              <div style={s.section}>
-                <div style={s.secHead}>Color</div>
-                <div style={s.secBody}>
-                  <div style={s.colorWrap}>
-                    <div style={{ ...s.swatch, background: rgbaToSwatchCss(cR,cG,cB,alpha) }}
-                      onClick={() => document.getElementById('_studioPicker').click()} />
-                    <input id="_studioPicker" type="color" value={color}
-                      style={{ position:'absolute', opacity:0, pointerEvents:'none', width:0, height:0 }}
-                      onChange={e => { setColor(e.target.value); setHexInput(e.target.value) }} />
-                    <input style={s.hexInput} value={hexInput} maxLength={7}
-                      onChange={e=>onHexChange(e.target.value)} placeholder="#rrggbb" />
+                <div style={{ ...s.secBody, display:'flex', flexDirection:'column', gap:'4px' }}>
+                  <div style={s.toolRow}>
+                    {[['pencil','✏ Pencil'],['fill','⬛ Fill'],['eraser','◻ Erase'],['eye','💉 Pick'],['drag','✥ Drag']].map(([id,label]) => (
+                      <button key={id} style={{ ...s.toolBtn, ...(tool===id?s.toolAct:{}) }} onClick={()=>setTool(id)}>{label}</button>
+                    ))}
                   </div>
-                  <div style={s.alphaRow}>
-                    <span style={{ width:'40px', flexShrink:0 }}>Alpha</span>
-                    <input type="range" min={0} max={255} style={s.alphaSlider} value={alpha} onChange={e=>setAlpha(Number(e.target.value))} />
-                    <span style={{ width:'28px', textAlign:'right', flexShrink:0, fontSize:'0.72rem' }}>{alpha}</span>
+                  <div style={{ display:'flex', gap:'4px' }}>
+                    <button style={{ ...s.btnSm, flex:1, opacity: undoCount?1:0.4, cursor: undoCount?'pointer':'default' }}
+                      onClick={texUndo} disabled={!undoCount}>↩ Undo</button>
+                    <button style={{ ...s.btnSm, flex:1, opacity: redoCount?1:0.4, cursor: redoCount?'pointer':'default' }}
+                      onClick={texRedo} disabled={!redoCount}>↪ Redo</button>
                   </div>
-                  {colorHistory.length > 0 && (
-                    <div style={s.histRow}>
-                      {colorHistory.map((c,i) => (
-                        <div key={i} style={{ ...s.histSwatch, background:c }} title={c}
-                          onClick={() => { setColor(c); setHexInput(c) }} />
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
 
-              <div style={s.section}>
-                <div style={s.secHead}>Zoom</div>
-                <div style={{ ...s.secBody, ...s.zoomRow }}>
-                  {ZOOM_LEVELS.map(z => (
-                    <button key={z} style={{ ...s.zoomBtn, ...(zoom===z?s.zoomAct:{}) }} onClick={()=>setZoom(z)}>{z}×</button>
-                  ))}
-                </div>
-              </div>
 
-              <div style={{ display:'flex', gap:'6px', alignItems:'center', flexWrap:'wrap' }}>
+<div style={{ display:'flex', gap:'6px', alignItems:'center', flexWrap:'wrap', padding:'0 4px 8px' }}>
                 <button style={s.btn} onClick={texSave}>Save PNG</button>
                 <button style={{ ...s.btn, ...(texVariantId ? {} : { background: 'var(--bg-panel-alt)', borderTopColor:'var(--bdr-lt)', borderLeftColor:'var(--bdr-lt)', borderRightColor:'var(--bdr-dk)', borderBottomColor:'var(--bdr-dk)', color:'var(--clr-text-dim)', cursor:'not-allowed' }) }}
                   onClick={texSaveVariant} disabled={!texVariantId} title="Save as per-variant texture override">
@@ -902,61 +1050,20 @@ export default function Studio() {
                 {texStatus==='ok' && <span style={s.ok}>Saved!</span>}
                 {texStatus && texStatus!=='ok' && <span style={s.err}>{texStatus}</span>}
               </div>
-            </>} {/* edit */}
-
-          </div>{/* tabContent */}
-
-          {/* Save bar inside sidebar — compose only */}
-          {tab === 'compose' && (
-            <div style={s.saveBar}>
-              <span style={s.label}>Save as variant</span>
-              <input style={s.inputFull} placeholder="file_name e.g. oak_boat4"
-                value={saveForm.file_name} onChange={e=>setSaveForm(f=>({...f,file_name:e.target.value}))} />
-              <input style={s.inputFull} placeholder="trigger e.g. Duce"
-                value={saveForm.trigger_name} onChange={e=>setSaveForm(f=>({...f,trigger_name:e.target.value}))} />
-              <div style={{ display:'flex', gap:'6px', alignItems:'center' }}>
-                <span style={s.label}>Order</span>
-                <input style={{ ...s.input, width:'50px' }} type="number"
-                  value={saveForm.order} onChange={e=>setSaveForm(f=>({...f,order:Number(e.target.value)}))} />
-              </div>
-              <button style={s.btn} onClick={saveVariant}>Save Variant</button>
-              {saveStatus==='ok' && <span style={s.ok}>Saved!</span>}
-              {saveStatus && saveStatus!=='ok' && <span style={s.err}>{saveStatus}</span>}
             </div>
-          )}
-        </div>{/* left panel */}
 
-        {/* ── Left divider ── */}
-        <div style={s.divider} onMouseDown={e => { e.preventDefault(); dragRef2.current = { side:'left', startX: e.clientX, startW: leftWidth } }} />
+          </div>{/* scrollable content */}
 
-        {/* ── Center: always-on CemViewer ── */}
-        <div style={s.centerPanel}>
-          {jem
-            ? <CemViewer jem={jem} onError={()=>{}} />
-            : <div style={{ color:'var(--clr-text-dim)', padding:'2rem', fontSize:'0.9rem' }}>Select a body to preview.</div>}
-        </div>
-
-        {/* ── Right divider + panel (Edit tab only) ── */}
-        {tab === 'edit' && <>
-          <div style={s.divider} onMouseDown={e => { e.preventDefault(); dragRef2.current = { side:'right', startX: e.clientX, startW: rightWidth } }} />
-
-          <div style={{ ...s.rightPanelEdit, width: rightWidth }}>
-            <div style={s.rightPanelUV}>
-              {uvBox
-                ? <UVCanvas img={uvImg} textureSize={uvTexSize} box={uvBox}
-                    selectedFace={selFace} onFaceSelect={setSelFace} onBoxChange={uvHandleBoxChange} />
-                : <div style={{ color:'var(--clr-text-dim)', fontSize:'0.9rem' }}>Select a box to edit UVs.</div>}
-            </div>
-            <div style={s.rightPanelDivH} />
-            <div style={s.rightPanelTex}>
-              {texPath
-                ? <canvas ref={canvasRef} style={s.canvasWrap}
-                    onMouseDown={onTexDown} onMouseMove={onTexMove}
-                    onMouseUp={onTexUp} onMouseLeave={onTexLeave} />
-                : <div style={{ color:'var(--clr-text-dim)', fontSize:'0.9rem' }}>Select a part to load its texture.</div>}
-            </div>
+          {/* Edit Model shortcut */}
+          <div style={{ padding:'6px 8px', display:'flex', alignItems:'center', gap:'8px', borderTop:'2px solid var(--bdr-dk)', background:'var(--bg-panel)', flexShrink:0 }}>
+            <button style={s.btn} onClick={() => {
+              if (editTab === 'part' && uvPartId) setModelerMode({ partId: uvPartId, bodyId })
+              else setModelerMode({ bodyId })
+            }}>Edit Model →</button>
+            <span style={s.label}>{editTab === 'part' ? (activeParts.find(p=>p.id===uvPartId)?.name ?? '—') : (currentBody?.name ?? '—')}</span>
           </div>
-        </>}
+
+        </div>{/* right panel */}
 
       </div>{/* content */}
 

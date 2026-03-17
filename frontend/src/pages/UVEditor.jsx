@@ -9,29 +9,29 @@ import { useEffect, useState } from 'react'
 import { api } from '../api'
 import UVCanvas from '../components/UVCanvas'
 
-const XP_INPUT = { padding: '3px 6px', background: 'var(--bg-input)', color: 'var(--clr-text)', borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)', fontFamily: 'Tahoma,sans-serif', fontSize: '11px' }
+const XP_INPUT = { padding: '3px 6px', background: 'var(--bg-input)', color: 'var(--clr-text)', borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)', fontFamily: 'Monocraft, sans-serif', fontSize: '11px' }
 
 const s = {
   page:        { display: 'flex', gap: '6px', height: 'calc(100vh - 48px)', overflow: 'hidden', background: 'var(--bg-window)', padding: '6px' },
   panel:       { width: '280px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto' },
   canvas:      { flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto' },
   section:     { background: 'var(--bg-window)', overflow: 'hidden', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)' },
-  secHead:     { background: 'var(--bg-title)', color: 'var(--clr-text-on-title)', padding: '2px 8px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'Tahoma,sans-serif', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid var(--bdr-dk)' },
+  secHead:     { background: 'var(--bg-title)', color: 'var(--clr-text-on-title)', padding: '2px 8px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'Monocraft, sans-serif', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid var(--bdr-dk)' },
   secBody:     { padding: '6px 8px' },
   select:      { ...XP_INPUT, width: '100%', boxSizing: 'border-box' },
-  treeItem:    { padding: '2px 4px', cursor: 'pointer', fontSize: '11px', userSelect: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'Tahoma,sans-serif' },
+  treeItem:    { padding: '2px 4px', cursor: 'pointer', fontSize: '11px', userSelect: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'Monocraft, sans-serif' },
   faceRow:     { display: 'flex', alignItems: 'center', gap: '6px', padding: '2px 0', fontSize: '11px' },
   dot:         { width: '10px', height: '10px', flexShrink: 0 },
-  coordLabel:  { width: '18px', color: 'var(--clr-text-dim)', fontSize: '10px', textAlign: 'right', flexShrink: 0, fontFamily: 'Tahoma,sans-serif' },
+  coordLabel:  { width: '18px', color: 'var(--clr-text-dim)', fontSize: '10px', textAlign: 'right', flexShrink: 0, fontFamily: 'Monocraft, sans-serif' },
   numInput:    { width: '46px', ...XP_INPUT },
-  btn:         { padding: '4px 16px', background: 'var(--bg-btn-primary)', borderTop: '2px solid var(--bdr-btn-primary-lt)', borderLeft: '2px solid var(--bdr-btn-primary-lt)', borderRight: '2px solid var(--bdr-btn-primary-dk)', borderBottom: '2px solid var(--bdr-btn-primary-dk)', color: '#fff', fontFamily: 'Tahoma,sans-serif', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', marginTop: '4px' },
-  btnSm:       { padding: '2px 8px', background: 'var(--bg-btn)', borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', cursor: 'pointer', fontSize: '11px', fontFamily: 'Tahoma,sans-serif' },
-  ok:          { color: 'var(--clr-ok)', fontSize: '11px', fontFamily: 'Tahoma,sans-serif' },
-  err:         { color: 'var(--clr-err)', fontSize: '11px', fontFamily: 'Tahoma,sans-serif' },
+  btn:         { padding: '4px 16px', background: 'var(--bg-btn-primary)', borderTop: '2px solid var(--bdr-btn-primary-lt)', borderLeft: '2px solid var(--bdr-btn-primary-lt)', borderRight: '2px solid var(--bdr-btn-primary-dk)', borderBottom: '2px solid var(--bdr-btn-primary-dk)', color: '#fff', fontFamily: 'Monocraft, sans-serif', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', marginTop: '4px' },
+  btnSm:       { padding: '2px 8px', background: 'var(--bg-btn)', borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', cursor: 'pointer', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
+  ok:          { color: 'var(--clr-ok)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
+  err:         { color: 'var(--clr-err)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
   offsetRow:   { display: 'flex', gap: '6px', alignItems: 'center', padding: '3px 0', fontSize: '11px' },
-  offsetLabel: { color: 'var(--clr-text-dim)', width: '14px', textAlign: 'right', fontSize: '10px', fontFamily: 'Tahoma,sans-serif' },
+  offsetLabel: { color: 'var(--clr-text-dim)', width: '14px', textAlign: 'right', fontSize: '10px', fontFamily: 'Monocraft, sans-serif' },
   tabBar:      { display: 'flex', gap: '2px', background: 'var(--bg-panel)', borderBottom: '2px solid var(--bdr-dk)', padding: '4px 4px 0' },
-  tab:         { flex: 1, padding: '3px 0', textAlign: 'center', borderRadius: '3px 3px 0 0', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: '1px solid var(--bdr-dk)', borderBottom: 'none', fontFamily: 'Tahoma,sans-serif', background: 'var(--bg-panel-alt)', color: 'var(--clr-text-dim)' },
+  tab:         { flex: 1, padding: '3px 0', textAlign: 'center', borderRadius: '3px 3px 0 0', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: '1px solid var(--bdr-dk)', borderBottom: 'none', fontFamily: 'Monocraft, sans-serif', background: 'var(--bg-panel-alt)', color: 'var(--clr-text-dim)' },
 }
 
 const FACE_COLORS = {
@@ -354,7 +354,7 @@ export default function UVEditor() {
                 onClick={() => currentBox && setSelectedFace(face)}
               >
                 <div style={{ ...s.dot, background: FACE_COLORS[face] }} />
-                <span style={{ color: selectedFace === face ? '#fff' : 'var(--clr-text-dim)', flex: 1, fontSize: '11px', fontFamily: 'Tahoma,sans-serif' }}>
+                <span style={{ color: selectedFace === face ? '#fff' : 'var(--clr-text-dim)', flex: 1, fontSize: '11px', fontFamily: 'Monocraft, sans-serif' }}>
                   {face.toUpperCase()}
                 </span>
               </div>

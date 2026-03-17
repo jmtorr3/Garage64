@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import CemViewer from '../components/CemViewer'
 
@@ -14,6 +15,7 @@ const s = {
 }
 
 export default function Viewer() {
+  const navigate = useNavigate()
   const [variants, setVariants] = useState([])
   const [selectedId, setSelectedId] = useState(null)
   const [jem, setJem] = useState(null)
@@ -73,6 +75,11 @@ export default function Viewer() {
         <span style={{ ...s.hint, marginLeft: 'auto' }}>
           drag to orbit · scroll to zoom · right-drag to pan
         </span>
+        <button
+          onClick={() => navigate('/gallery')}
+          style={{ padding: '5px 14px', background: 'linear-gradient(180deg,#4590d6,#1060c4)', border: '1px solid #0a246a', borderRadius: '3px', color: '#fff', fontFamily: 'Monocraft, sans-serif', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
+          Go to Garage
+        </button>
       </div>
 
       <div style={s.canvas}>

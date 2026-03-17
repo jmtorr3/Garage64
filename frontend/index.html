@@ -5,6 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Garage64 Editor</title>
     <style>
+      @font-face {
+        font-family: 'Monocraft';
+        src: url('/fonts/Monocraft.ttf') format('truetype');
+        font-weight: normal;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: 'Monocraft';
+        src: url('/fonts/Monocraft-Bold.ttf') format('truetype');
+        font-weight: bold;
+        font-style: normal;
+      }
+
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
       /* ── XP Light theme (default) ────────────────────────────────────────── */
@@ -80,7 +93,7 @@
       }
 
       body {
-        font-family: Tahoma, 'Segoe UI', sans-serif;
+        font-family: 'Monocraft', Tahoma, 'Segoe UI', sans-serif;
         font-size: 11px;
         background: var(--bg-body);
         color: var(--clr-text);

@@ -17,7 +17,7 @@ const s = {
     fontWeight: 'bold',
     color: '#fff',
     fontSize: '22px',
-    fontFamily: 'Tahoma, "Segoe UI", sans-serif',
+    fontFamily: 'Monocraft, "Segoe UI", sans-serif',
     fontStyle: 'italic',
     textShadow: '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 2px 2px 4px rgba(0,0,0,0.6)',
     marginRight: '14px',
@@ -36,7 +36,7 @@ const s = {
     color: 'rgba(255,255,255,0.88)',
     textDecoration: 'none',
     fontSize: '11px',
-    fontFamily: 'Tahoma, sans-serif',
+    fontFamily: 'Monocraft, sans-serif',
     padding: '4px 10px',
     borderRadius: '3px',
     whiteSpace: 'nowrap',
@@ -57,7 +57,7 @@ const s = {
     color: '#fff',
     cursor: 'pointer',
     fontSize: '11px',
-    fontFamily: 'Tahoma, sans-serif',
+    fontFamily: 'Monocraft, sans-serif',
     flexShrink: 0,
   },
 }
@@ -70,10 +70,9 @@ export default function NavBar() {
       <span style={s.brand}>Garage64</span>
       <div style={s.divider} />
       {[
-        { to: '/gallery',  label: 'Gallery'    },
+        { to: '/viewer',   label: 'Viewer'     },
+        { to: '/gallery',  label: 'Garage'     },
         { to: '/studio',   label: 'Studio'     },
-        { to: '/parts',    label: 'Parts'      },
-        { to: '/uv',       label: 'UV Editor'  },
         { to: '/texture',  label: 'Texture'    },
         { to: '/export',   label: 'Export'     },
       ].map(({ to, label }) => (

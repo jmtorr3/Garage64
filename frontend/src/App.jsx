@@ -5,8 +5,10 @@ import Gallery from './pages/Gallery'
 import Parts from './pages/Parts'
 import Export from './pages/Export'
 import Studio from './pages/Studio'
+import Viewer from './pages/Viewer'
 import UVEditor from './pages/UVEditor'
 import TextureEditor from './pages/TextureEditor'
+import Modeler from './pages/Modeler'
 
 const s = {
   layout: { display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-window)' },
@@ -20,13 +22,14 @@ export default function App() {
       <NavBar />
       <main style={s.main}>
         <Routes>
-          <Route path="/" element={<Navigate to="/gallery" replace />} />
+          <Route path="/" element={<Navigate to="/viewer" replace />} />
+          <Route path="/viewer" element={<Viewer />} />
           <Route path="/gallery" element={<Gallery />} />
           <Route path="/variants" element={<Navigate to="/gallery" replace />} />
-          <Route path="/viewer" element={<Navigate to="/gallery" replace />} />
           <Route path="/parts" element={<Parts />} />
           <Route path="/export" element={<Export />} />
           <Route path="/studio" element={<Studio />} />
+          <Route path="/modeler" element={<Modeler />} />
           <Route path="/uv" element={<UVEditor />} />
           <Route path="/texture" element={<TextureEditor />} />
         </Routes>

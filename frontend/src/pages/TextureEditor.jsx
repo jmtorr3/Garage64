@@ -14,15 +14,15 @@ const ZOOM_LEVELS = [2, 4, 6, 8, 12, 16, 24, 32]
 const CHECKER_A  = '#1a1a1a'
 const CHECKER_B  = '#222222'
 
-const XP_IN  = { padding: '3px 6px', background: 'var(--bg-input)', color: 'var(--clr-text)', borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)', fontFamily: 'Tahoma,sans-serif', fontSize: '11px' }
-const XP_BTN = { padding: '2px 8px', background: 'var(--bg-btn)', borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', cursor: 'pointer', fontSize: '11px', fontFamily: 'Tahoma,sans-serif', fontWeight: 'bold' }
+const XP_IN  = { padding: '3px 6px', background: 'var(--bg-input)', color: 'var(--clr-text)', borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)', fontFamily: 'Monocraft, sans-serif', fontSize: '11px' }
+const XP_BTN = { padding: '2px 8px', background: 'var(--bg-btn)', borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', cursor: 'pointer', fontSize: '11px', fontFamily: 'Monocraft, sans-serif', fontWeight: 'bold' }
 
 const s = {
   page:      { display: 'flex', gap: '6px', height: 'calc(100vh - 48px)', overflow: 'hidden', background: 'var(--bg-window)', padding: '6px' },
   panel:     { width: '230px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto' },
   main:      { flex: 1, overflow: 'auto', background: '#1a1a1a', padding: '8px' },
   section:   { background: 'var(--bg-window)', overflow: 'hidden', marginBottom: '4px', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)' },
-  secHead:   { background: 'var(--bg-title)', color: 'var(--clr-text-on-title)', padding: '2px 8px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'Tahoma,sans-serif', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid var(--bdr-dk)' },
+  secHead:   { background: 'var(--bg-title)', color: 'var(--clr-text-on-title)', padding: '2px 8px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'Monocraft, sans-serif', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid var(--bdr-dk)' },
   secBody:   { padding: '6px 8px' },
   select:    { ...XP_IN, width: '100%', boxSizing: 'border-box', marginBottom: '4px' },
   input:     { ...XP_IN, width: '100%', boxSizing: 'border-box' },
@@ -32,13 +32,13 @@ const s = {
   colorWrap: { display: 'flex', gap: '8px', alignItems: 'center' },
   swatch:    { width: '36px', height: '36px', borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)', cursor: 'pointer', flexShrink: 0 },
   hexInput:  { ...XP_IN, flex: 1 },
-  alphaRow:  { display: 'flex', gap: '6px', alignItems: 'center', marginTop: '4px', fontSize: '11px', color: 'var(--clr-text-dim)', fontFamily: 'Tahoma,sans-serif' },
+  alphaRow:  { display: 'flex', gap: '6px', alignItems: 'center', marginTop: '4px', fontSize: '11px', color: 'var(--clr-text-dim)', fontFamily: 'Monocraft, sans-serif' },
   alphaSlider: { flex: 1, accentColor: 'var(--clr-accent)' },
-  btn:       { padding: '4px 16px', background: 'var(--bg-btn-primary)', borderTop: '2px solid var(--bdr-btn-primary-lt)', borderLeft: '2px solid var(--bdr-btn-primary-lt)', borderRight: '2px solid var(--bdr-btn-primary-dk)', borderBottom: '2px solid var(--bdr-btn-primary-dk)', color: '#fff', fontFamily: 'Tahoma,sans-serif', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', width: '100%', marginTop: '4px' },
+  btn:       { padding: '4px 16px', background: 'var(--bg-btn-primary)', borderTop: '2px solid var(--bdr-btn-primary-lt)', borderLeft: '2px solid var(--bdr-btn-primary-lt)', borderRight: '2px solid var(--bdr-btn-primary-dk)', borderBottom: '2px solid var(--bdr-btn-primary-dk)', color: '#fff', fontFamily: 'Monocraft, sans-serif', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', width: '100%', marginTop: '4px' },
   btnSm:     XP_BTN,
-  ok:        { color: 'var(--clr-ok)', fontSize: '11px', marginTop: '4px', fontFamily: 'Tahoma,sans-serif' },
-  err:       { color: 'var(--clr-err)', fontSize: '11px', marginTop: '4px', fontFamily: 'Tahoma,sans-serif' },
-  infoRow:   { fontSize: '10px', color: 'var(--clr-text-dim)', marginTop: '4px', fontFamily: 'Tahoma,sans-serif' },
+  ok:        { color: 'var(--clr-ok)', fontSize: '11px', marginTop: '4px', fontFamily: 'Monocraft, sans-serif' },
+  err:       { color: 'var(--clr-err)', fontSize: '11px', marginTop: '4px', fontFamily: 'Monocraft, sans-serif' },
+  infoRow:   { fontSize: '10px', color: 'var(--clr-text-dim)', marginTop: '4px', fontFamily: 'Monocraft, sans-serif' },
   zoomRow:   { display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' },
   zoomBtn:   { ...XP_BTN, padding: '2px 5px', fontSize: '10px' },
   zoomAct:   { background: 'var(--bg-btn-active)', borderTop: '1px solid var(--bdr-dk)', borderLeft: '1px solid var(--bdr-dk)', borderRight: '1px solid var(--bdr-input-lt)', borderBottom: '1px solid var(--bdr-input-lt)', color: 'var(--clr-text)', fontWeight: 'bold' },
