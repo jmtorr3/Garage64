@@ -26,6 +26,12 @@ export default function CemViewer({ jem, onError, autoRotate = false, sidebarOff
     ctxRef.current.scene.background = new THREE.Color(bgColor ?? 0x1a1a2e)
   }, [bgColor])
 
+  // Toggle grid visibility
+  useEffect(() => {
+    if (!ctxRef.current?.grid) return
+    ctxRef.current.grid.visible = showGrid
+  }, [showGrid])
+
   // ── One-time scene / camera setup ────────────────────────────────────────
   useEffect(() => {
     const mount = mountRef.current
@@ -39,8 +45,9 @@ export default function CemViewer({ jem, onError, autoRotate = false, sidebarOff
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(bgColor ?? 0x1a1a2e)
-    const grid = showGrid ? new THREE.GridHelper(128, 32, 0x333355, 0x222233) : null
-    if (grid) scene.add(grid)
+    const grid = new THREE.GridHelper(128, 32, 0x333355, 0x222233)
+    grid.visible = showGrid
+    scene.add(grid)
     if (showAxes) scene.add(new THREE.AxesHelper(8))
 
     const camera = new THREE.PerspectiveCamera(55, w / h, 0.1, 2000)

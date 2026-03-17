@@ -158,6 +158,7 @@ export default function Studio() {
 
   const [texEditorMode, setTexEditorMode] = useState(false)
   const [modelerMode, setModelerMode] = useState(null) // null | { partId, bodyId }
+  const [showGrid, setShowGrid] = useState(false)
 
   // Shared data
   const [bodies, setBodies] = useState([])
@@ -766,6 +767,7 @@ export default function Studio() {
       <div style={s.topBar}>
         <button style={s.btnSm} onClick={() => navigate('/gallery')}>← Garage</button>
         <button style={s.btnSm} onClick={() => setModelerMode({ bodyId })}>Modeler</button>
+        <button style={{ ...s.btnSm, ...(showGrid ? { background: 'var(--bg-btn-active)', borderTop: '1px solid var(--bdr-dk)', borderLeft: '1px solid var(--bdr-dk)', borderRight: '1px solid var(--bdr-input-lt)', borderBottom: '1px solid var(--bdr-input-lt)' } : {}) }} onClick={() => setShowGrid(g => !g)}>⊞ Grid</button>
         <span style={s.label}>Body</span>
         <select style={s.selectSm} value={bodyId??''} onChange={e => setBodyId(Number(e.target.value))}>
           {bodies.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -916,7 +918,7 @@ export default function Studio() {
         {/* ── Center: 3D viewer + floating canvas panel ── */}
         <div style={s.centerPanel}>
           {jem
-            ? <CemViewer jem={jem} onError={()=>{}} showGrid={false} showAxes={false} bgColor={bg} />
+            ? <CemViewer jem={jem} onError={()=>{}} showGrid={showGrid} showAxes={false} bgColor={bg} />
             : <div style={{ color:'var(--clr-text-dim)', padding:'2rem', fontSize:'0.9rem' }}>Select a body to preview.</div>}
 
         </div>
