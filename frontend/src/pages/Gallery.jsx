@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import CemViewer from '../components/CemViewer'
-import Parts from './Parts'
 import Export from './Export'
 import { useTheme } from '../ThemeContext'
 
@@ -49,7 +48,7 @@ export default function Gallery() {
   const viewerRef = useRef(null)
   const { isDark } = useTheme()
   const bg = isDark ? '#1e1e1e' : '#ece9d8'
-  const [gTab,        setGTab]        = useState('cars')  // 'cars' | 'parts' | 'export'
+  const [gTab,        setGTab]        = useState('cars')  // 'cars' | 'export'
   const [variants,    setVariants]    = useState([])
   const [parts,       setParts]       = useState([])
   const [bodies,      setBodies]      = useState([])
@@ -134,21 +133,24 @@ export default function Gallery() {
       {/* ── Top header with tabs ── */}
       <div style={{ display: 'flex', alignItems: 'center', borderBottom: '2px solid var(--bdr-dk)', flexShrink: 0, background: 'var(--bg-panel)' }}>
         <span style={{ ...s.sideTitle, padding: '4px 10px', borderRight: '1px solid var(--bdr-dk)' }}>Garage</span>
-        {[['cars', 'Cars'], ['parts', 'Parts'], ['export', 'Export']].map(([id, label]) => (
+        {[['cars', 'Cars'], ['export', 'Export']].map(([id, label]) => (
           <button key={id} onClick={() => { setGTab(id); setEditing(null) }}
             style={{ padding: '4px 14px', fontSize: '11px', fontFamily: 'Monocraft, sans-serif', fontWeight: gTab === id ? 'bold' : 'normal', background: gTab === id ? 'var(--bg-window)' : 'transparent', color: gTab === id ? 'var(--clr-text)' : 'var(--clr-text-dim)', border: 'none', borderRight: '1px solid var(--bdr-dk)', cursor: 'pointer', height: '100%' }}>
             {label}
           </button>
         ))}
+        <button
+          onClick={() => navigate('/parts-library')}
+          style={{ padding: '4px 14px', fontSize: '11px', fontFamily: 'Monocraft, sans-serif', fontWeight: 'normal', background: 'transparent', color: 'var(--clr-text-dim)', border: 'none', borderRight: '1px solid var(--bdr-dk)', cursor: 'pointer', height: '100%' }}>
+          All Parts
+        </button>
+        <button
+          onClick={() => navigate('/parts-library')}
+          style={{ padding: '4px 14px', fontSize: '11px', fontFamily: 'Monocraft, sans-serif', fontWeight: 'normal', background: 'transparent', color: 'var(--clr-text-dim)', border: 'none', borderRight: '1px solid var(--bdr-dk)', cursor: 'pointer', height: '100%' }}>
+          All Bodies
+        </button>
         <div style={{ flex: 1 }} />
       </div>
-
-      {/* ── Parts tab ── */}
-      {gTab === 'parts' && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.5rem' }}>
-          <Parts />
-        </div>
-      )}
 
       {/* ── Export tab ── */}
       {gTab === 'export' && (

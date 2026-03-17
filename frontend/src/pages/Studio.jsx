@@ -9,119 +9,6 @@ import CemViewer from '../components/CemViewer'
 import Modeler from './Modeler'
 import { useTheme } from '../ThemeContext'
 
-// ── Music Player ──────────────────────────────────────────────────────────────
-
-function MusicPlayer() {
-  const [tracks,    setTracks]    = useState([])
-  const [idx,       setIdx]       = useState(0)
-  const [playing,   setPlaying]   = useState(false)
-  const [progress,  setProgress]  = useState(0)
-  const [volume,    setVolume]    = useState(() => Number(localStorage.getItem('mp_vol') ?? 0.7))
-  const [musicDir,  setMusicDir]  = useState(() => localStorage.getItem('mp_dir') || '')
-  const [dirInput,  setDirInput]  = useState(() => localStorage.getItem('mp_dir') || '')
-  const [showDir,   setShowDir]   = useState(false)
-  const [dirErr,    setDirErr]    = useState('')
-  const audioRef = useRef(null)
-
-  function loadDir(dir) {
-    setDirErr('')
-    const url = dir ? `/api/music/?dir=${encodeURIComponent(dir)}` : '/api/music/'
-    fetch(url).then(r => r.json()).then(data => {
-      if (data.error) { setDirErr(data.error); return }
-      setTracks(data)
-      setIdx(0)
-      localStorage.setItem('mp_dir', dir)
-      setMusicDir(dir)
-      setShowDir(false)
-    }).catch(() => setDirErr('Failed to load tracks'))
-  }
-
-  useEffect(() => { loadDir(musicDir) }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const track = tracks[idx] ?? null
-
-  useEffect(() => {
-    const a = audioRef.current
-    if (!a || !track) return
-    a.src = `/api/music/stream/?path=${encodeURIComponent(track.path)}`
-    a.volume = volume
-    if (playing) a.play().catch(() => {})
-  }, [track]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (audioRef.current) audioRef.current.volume = volume
-    localStorage.setItem('mp_vol', volume)
-  }, [volume])
-
-  function togglePlay() {
-    const a = audioRef.current
-    if (!a || !track) return
-    if (playing) { a.pause(); setPlaying(false) }
-    else { a.play().catch(() => {}); setPlaying(true) }
-  }
-
-  function prev() { setIdx(i => (i - 1 + tracks.length) % tracks.length); setPlaying(true) }
-  function next() { setIdx(i => (i + 1) % tracks.length); setPlaying(true) }
-
-  function onTimeUpdate() {
-    const a = audioRef.current
-    if (a && a.duration) setProgress(a.currentTime / a.duration)
-  }
-
-  function seek(e) {
-    const a = audioRef.current
-    if (a && a.duration) a.currentTime = Number(e.target.value) * a.duration
-  }
-
-  const name = track ? track.name.replace(/\.[^.]+$/, '') : '—'
-  const btn = { ...XP_BTN_SM, padding: '1px 6px', fontSize: '12px' }
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1, position: 'relative' }}>
-      <audio ref={audioRef} onTimeUpdate={onTimeUpdate} onEnded={next} />
-
-      {/* Directory picker popover */}
-      <button style={btn} title="Set music folder" onClick={() => setShowDir(v => !v)}>📁</button>
-      {showDir && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 999, background: 'var(--bg-panel)', border: '2px solid var(--bdr-dk)', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '320px', marginTop: '2px' }}>
-          <span style={{ fontSize: '11px', fontFamily: 'Monocraft, sans-serif', color: 'var(--clr-text-dim)' }}>Music directory path</span>
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <input style={{ ...XP_INPUT, flex: 1, fontSize: '11px' }}
-              value={dirInput} onChange={e => setDirInput(e.target.value)}
-              placeholder="/home/user/Music"
-              onKeyDown={e => e.key === 'Enter' && loadDir(dirInput)} />
-            <button style={btn} onClick={() => loadDir(dirInput)}>Load</button>
-          </div>
-          {dirErr && <span style={{ fontSize: '10px', color: 'var(--clr-err)', fontFamily: 'Monocraft, sans-serif' }}>{dirErr}</span>}
-          {musicDir && <span style={{ fontSize: '10px', color: 'var(--clr-text-dim)', fontFamily: 'Monocraft, sans-serif' }}>Current: {musicDir} ({tracks.length} tracks)</span>}
-        </div>
-      )}
-
-      <button style={btn} onClick={prev}  disabled={!tracks.length}>⏮</button>
-      <button style={btn} onClick={togglePlay} disabled={!tracks.length}>{playing ? '⏸' : '▶'}</button>
-      <button style={btn} onClick={next}  disabled={!tracks.length}>⏭</button>
-
-      <span style={{ fontSize: '11px', fontFamily: 'Monocraft, sans-serif', color: 'var(--clr-text)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1 }}
-        title={name}>{name}</span>
-
-      <input type="range" min={0} max={1} step={0.001} value={progress} onChange={seek}
-        style={{ flex: 1, minWidth: '60px', accentColor: 'var(--clr-accent)', cursor: 'pointer' }} />
-
-      <input type="range" min={0} max={1} step={0.01} value={volume}
-        onChange={e => setVolume(Number(e.target.value))}
-        style={{ width: '50px', accentColor: 'var(--clr-accent)', cursor: 'pointer' }} />
-
-      {tracks.length > 0 && (
-        <select style={{ ...XP_INPUT, fontSize: '10px', maxWidth: '120px' }}
-          value={idx} onChange={e => { setIdx(Number(e.target.value)); setPlaying(true) }}>
-          {tracks.map((t, i) => (
-            <option key={t.path} value={i}>{t.name.replace(/\.[^.]+$/, '')}</option>
-          ))}
-        </select>
-      )}
-    </div>
-  )
-}
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -274,6 +161,8 @@ export default function Studio() {
   const { isDark } = useTheme()
   const bg = isDark ? '#1e1e1e' : '#ece9d8'
 
+  const partEditMode = searchParams.get('newPart') === '1'  // arrived from Parts Library
+
   const [texEditorMode, setTexEditorMode] = useState(false)
   const [modelerMode, setModelerMode] = useState(null) // null | { partId, bodyId }
   const [showGrid, setShowGrid] = useState(true)
@@ -290,6 +179,8 @@ export default function Studio() {
   const [saveForm,        setSaveForm]        = useState({ file_name: '', trigger_name: '', order: 1 })
   const [currentVariantId, setCurrentVariantId] = useState(null)
   const [saveStatus, setSaveStatus] = useState('')
+  const [partSaveName,  setPartSaveName]  = useState('')
+  const [partSaveStatus, setPartSaveStatus] = useState('')
   const [showManage,   setShowManage]   = useState(false)
   const [showCompose,  setShowCompose]  = useState(true)
   const [showBodyViewer,  setShowBodyViewer]  = useState(true)
@@ -298,7 +189,8 @@ export default function Studio() {
   const [slotStatus, setSlotStatus] = useState('')
 
   // ── Shared viewer ref (center CemViewer exposed to Modeler) ─────────────────
-  const viewerRef = useRef(null)
+  const viewerRef  = useRef(null)
+  const modelerRef = useRef(null)
   const initialCamera = useMemo(() => {
     const raw = sessionStorage.getItem('garage64_camera')
     if (!raw) return null
@@ -350,7 +242,8 @@ export default function Studio() {
 
   // ── Load on mount ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    const variantId = searchParams.get('variantId')
+    const variantId  = searchParams.get('variantId')
+    const bodyIdParam = searchParams.get('bodyId')
     api.getBodies().then(bs => {
       setBodies(bs)
       if (variantId) {
@@ -370,6 +263,10 @@ export default function Studio() {
           setCurrentVariantId(v.id)
           setSaveForm({ file_name: v.file_name, trigger_name: v.trigger_name || '', order: v.order ?? 1 })
         }).catch(() => { if (bs.length) setBodyId(bs[0].id) })
+      } else if (bodyIdParam) {
+        const match = bs.find(b => String(b.id) === bodyIdParam)
+        if (match) setBodyId(match.id)
+        else if (bs.length) setBodyId(bs[0].id)
       } else if (bs.length) {
         setBodyId(bs[0].id)
       }
@@ -377,8 +274,22 @@ export default function Studio() {
     api.getParts().then(ps => {
       setParts(ps)
       if (ps.length) { setUvPartId(ps[0].id) }
-      // Template: pre-select first part from each slot when creating new
-      if (!searchParams.get('variantId')) {
+      const presetId = searchParams.get('presetPartId')
+      if (presetId) {
+        // Preset launch from Parts Library — select that part and open Block Editor
+        const preset = ps.find(p => String(p.id) === presetId)
+        if (preset) {
+          if (preset.slot) {
+            setSlotSel(prev => ({ ...prev, [preset.slot]: preset.id }))
+          } else {
+            setExtraSel(new Set([preset.id]))
+          }
+          setComposeSelItem({ kind: 'part', partId: preset.id })
+          setEditTab('modeler')
+          setPartSaveName(preset.name)
+        }
+      } else if (!searchParams.get('variantId')) {
+        // Template: pre-select first part from each slot when creating new
         const template = {}
         for (const p of ps) {
           if (p.slot && !template[p.slot]) template[p.slot] = p.id
@@ -802,6 +713,27 @@ export default function Studio() {
   function toggleExtra(partId) {
     setExtraSel(prev => { const n=new Set(prev); n.has(partId)?n.delete(partId):n.add(partId); return n })
   }
+  async function savePartFromEditor() {
+    setPartSaveStatus('')
+    if (!partSaveName) { setPartSaveStatus('Enter a part name.'); return }
+    const { partObj, partData } = modelerRef.current?.getPartData() ?? {}
+    if (!partData) { setPartSaveStatus('No part data.'); return }
+    const bodyName = currentBody?.name || 'unknown'
+    const jpmPath  = `minecraft:optifine/cem/${bodyName}/parts/${partSaveName}.jpm`
+    try {
+      const payload = {
+        name:            partSaveName,
+        jpm_path:        jpmPath,
+        slot:            partObj?.slot || '',
+        part_data:       partData,
+        attachment_meta: partObj?.attachment_meta || {},
+      }
+      const created = await api.createPart(payload)
+      setParts(ps => [...ps, created])
+      setPartSaveStatus('ok')
+    } catch (e) { setPartSaveStatus(e.message) }
+  }
+
   async function saveVariant() {
     setSaveStatus('')
     if (!saveForm.file_name) { setSaveStatus('Enter a file name.'); return }
@@ -1039,7 +971,6 @@ export default function Studio() {
       {/* Top bar */}
       <div style={s.topBar}>
         <button style={s.btnSm} onClick={() => navigate('/gallery')}>← Garage</button>
-        <MusicPlayer />
         <span style={{ marginLeft: 'auto' }}>
           {activeParts.length
             ? activeParts.map(p => <span key={p.id} style={s.badge}>+{p.name}</span>)
@@ -1050,8 +981,51 @@ export default function Studio() {
       {/* Content */}
       <div style={s.content}>
 
-        {/* ── Left panel — always Compose ── */}
+        {/* ── Left panel ── */}
         <div style={{ ...s.sidebar, width: leftWidth }}>
+
+          {partEditMode ? (() => {
+            // ── Part Edit Mode: simplified single-part view ──
+            const editingPart = composeSelItem?.kind === 'part'
+              ? parts.find(p => p.id === composeSelItem.partId) : null
+            const partMini = editingPart ? partToMiniJem(editingPart) : null
+            return (
+              <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
+                <div style={{ ...XP_TITLE, display:'flex', alignItems:'center', gap:'6px' }}>
+                  <button style={{ ...s.btnSm, fontSize:'9px', padding:'1px 6px' }}
+                    onClick={() => navigate('/parts-library')}>←</button>
+                  <span style={{ flex:1 }}>Editing Part</span>
+                </div>
+                <div style={{ flex:1, overflowY:'auto', padding:'6px' }}>
+                  {editingPart ? (
+                    <div style={s.slotBox}>
+                      <div style={s.miniViewer}>
+                        {partMini
+                          ? <CemViewer jem={partMini} onError={()=>{}} autoRotate sidebarOffset={0} showGrid={false} showAxes={false} fitScale={0.55} enableZoom={false} bgColor={bg} />
+                          : <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.25)', fontSize:'10px', fontFamily:'Monocraft, sans-serif' }}>no preview</div>
+                        }
+                      </div>
+                      <div style={{ padding:'6px 8px' }}>
+                        <div style={{ fontSize:'11px', fontWeight:'bold', color:'var(--clr-text)', fontFamily:'Monocraft, sans-serif', marginBottom:'3px' }}>{editingPart.name}</div>
+                        <div style={{ fontSize:'9px', color:'var(--clr-text-dim)', fontFamily:'monospace', wordBreak:'break-all' }}>{editingPart.jpm_path}</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ padding:'8px', fontSize:'11px', color:'var(--clr-text-dim)', fontFamily:'Monocraft, sans-serif' }}>No part selected.</div>
+                  )}
+                </div>
+                <div style={s.saveBar}>
+                  <span style={s.label}>Save as part (.jpm)</span>
+                  <input style={s.inputFull} placeholder="part_name e.g. miata_duce_wheels"
+                    value={partSaveName} onChange={e => setPartSaveName(e.target.value)} />
+                  <button style={s.btn} onClick={savePartFromEditor}>Save Part</button>
+                  {partSaveStatus === 'ok' && <span style={s.ok}>Saved!</span>}
+                  {partSaveStatus && partSaveStatus !== 'ok' && <span style={s.err}>{partSaveStatus}</span>}
+                </div>
+              </div>
+            )
+          })() : (
+          <>
           <div style={{ ...XP_TITLE, display:'flex', alignItems:'center' }}>
             <span style={{ flex:1 }}>Compose</span>
             <input type="checkbox" checked={showCompose} onChange={() => setShowCompose(v => !v)}
@@ -1189,6 +1163,7 @@ export default function Studio() {
             {saveStatus==='ok' && <span style={s.ok}>Saved!</span>}
             {saveStatus && saveStatus!=='ok' && <span style={s.err}>{saveStatus}</span>}
           </div>}
+          </>)}
         </div>{/* left panel */}
 
         {/* ── Left divider ── */}
@@ -1197,7 +1172,7 @@ export default function Studio() {
         {/* ── Center: 3D viewer (always visible) ── */}
         <div style={{ ...s.centerPanel, position: 'relative' }}>
           {centerJem
-            ? <CemViewer ref={viewerRef} jem={editTab === 'modeler' ? null : viewerJem} onError={()=>{}} showGrid={showGrid} showAxes={false} bgColor={bg}
+            ? <CemViewer ref={viewerRef} jem={editTab === 'modeler' ? null : (partEditMode ? centerJem : viewerJem)} onError={()=>{}} showGrid={showGrid} showAxes={false} bgColor={bg}
                 initialCamera={initialCamera}
                 enablePaint={editTab !== 'modeler' && !!texPath && tool !== 'drag'} onPaintUV={onPaintUV} texturePatch={texturePatch} paintTexPath={texPath} />
             : <div style={{ color:'var(--clr-text-dim)', padding:'2rem', fontSize:'0.9rem' }}>Select a body to preview.</div>}
@@ -1236,7 +1211,7 @@ export default function Studio() {
 
           {/* Scrollable content under the active tab */}
           {editTab === 'modeler' ? (
-            <Modeler sharedViewerRef={viewerRef} embedded texturePatch={texturePatch}
+            <Modeler ref={modelerRef} sharedViewerRef={viewerRef} embedded texturePatch={texturePatch}
               bodyId={bodyId}
               partId={composeSelItem?.kind === 'part' ? composeSelItem.partId : null}
               onBack={() => switchEditTab('texture')} />
@@ -1332,7 +1307,7 @@ export default function Studio() {
                 </div>
               </div>
 
-<div style={s.section}>
+{!partEditMode && <div style={s.section}>
                 <div style={s.secHead}>Variant Override</div>
                 <div style={s.secBody}>
                   <select style={s.select} value={texVariantId} onChange={e=>setTexVariantId(e.target.value)}>
@@ -1350,7 +1325,7 @@ export default function Studio() {
                       : <div style={{ ...s.infoRow, marginTop:'4px' }}>No override — uses body texture</div>
                   })()}
                 </div>
-              </div>
+              </div>}
 
               <div style={s.section}>
                 <div style={s.secHead}>Tool</div>
@@ -1373,10 +1348,13 @@ export default function Studio() {
 <div style={{ display:'flex', gap:'6px', alignItems:'center', flexWrap:'wrap', padding:'0 4px 8px' }}>
                 <button style={s.btn} onClick={texSave}>Save PNG</button>
                 <button style={s.btn} onClick={texSaveAs}>Save As</button>
-                <button style={{ ...s.btn, ...(texVariantId ? {} : { background: 'var(--bg-panel-alt)', borderTopColor:'var(--bdr-lt)', borderLeftColor:'var(--bdr-lt)', borderRightColor:'var(--bdr-dk)', borderBottomColor:'var(--bdr-dk)', color:'var(--clr-text-dim)', cursor:'not-allowed' }) }}
-                  onClick={texSaveVariant} disabled={!texVariantId} title="Save as per-variant texture override">
-                  Save Override
-                </button>
+                {partEditMode
+                  ? <button style={s.btn} onClick={texSave} title="Save texture to this part's file">Save as Variant Part</button>
+                  : <button style={{ ...s.btn, ...(texVariantId ? {} : { background: 'var(--bg-panel-alt)', borderTopColor:'var(--bdr-lt)', borderLeftColor:'var(--bdr-lt)', borderRightColor:'var(--bdr-dk)', borderBottomColor:'var(--bdr-dk)', color:'var(--clr-text-dim)', cursor:'not-allowed' }) }}
+                      onClick={texSaveVariant} disabled={!texVariantId} title="Save as per-variant texture override">
+                      Save Override
+                    </button>
+                }
                 {hoverPixel && texBuf && <span style={{ fontSize:'0.72rem', color:'var(--clr-text-dim)' }}>({hoverPixel[0]}, {hoverPixel[1]})</span>}
                 {texStatus==='ok' && <span style={s.ok}>Saved!</span>}
                 {texStatus && texStatus!=='ok' && <span style={s.err}>{texStatus}</span>}

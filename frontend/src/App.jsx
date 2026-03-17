@@ -3,6 +3,7 @@ import NavBar from './components/NavBar'
 import { ThemeProvider } from './ThemeContext'
 import Gallery from './pages/Gallery'
 import Parts from './pages/Parts'
+import PartsLibrary from './pages/PartsLibrary'
 import Export from './pages/Export'
 import Studio from './pages/Studio'
 import Viewer from './pages/Viewer'
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="/gallery" element={<Gallery />} />
           <Route path="/variants" element={<Navigate to="/gallery" replace />} />
           <Route path="/parts" element={<Parts />} />
+          <Route path="/parts-library" element={<PartsLibrary />} />
           <Route path="/export" element={<Export />} />
           <Route path="/studio" element={<Studio />} />
           <Route path="/modeler" element={<Modeler />} />

@@ -3,7 +3,7 @@
  * Outliner | 3D viewport with TransformControls gizmos | Properties panel.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, forwardRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTheme } from '../ThemeContext'
 import * as THREE from 'three'
@@ -245,7 +245,7 @@ function Vec3Input({label, value=[0,0,0], step=0.5, onChange}) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function Modeler({ partId: initPartId, bodyId: initBodyId, onBack, embedded = false, sharedViewerRef = null, texturePatch = null } = {}) {
+const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBodyId, onBack, embedded = false, sharedViewerRef = null, texturePatch = null } = {}, ref) {
   const [searchParams] = useSearchParams()
   const { isDark } = useTheme()
   const bg = isDark ? '#1e1e1e' : '#ece9d8'
@@ -850,6 +850,13 @@ const [selFace,  setSelFace]  = useState(null)
     } catch(e) { setStatus(e.message) }
   }
 
+  useImperativeHandle(ref, () => ({
+    getPartData: () => {
+      const partData = dataRef.current?.models[0]?.submodels?.[0] ?? dataRef.current?.models[0]
+      return { partObj: partObjRef.current, partData }
+    },
+  }), [])
+
   function revert() {
     dataRef.current=origRef.current
     setDataVer(v=>v+1); setDirty(false); clearSel(); setStatus('')
@@ -1060,4 +1067,6 @@ const [selFace,  setSelFace]  = useState(null)
       </div>
     </div>
   )
-}
+})
+
+export default Modeler
