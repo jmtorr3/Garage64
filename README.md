@@ -75,6 +75,11 @@ EntityBody          — base JEM template (e.g. miata_base / oak_boat entity)
                                       └── PartSlot (slot category e.g. wheels)
 ```
 
+## Documentation
+
+- [Frontend](frontend/FRONTEND.md) — pages, components, API layer, data structures, styling
+- [Backend](backend/BACKEND.md) — models, REST endpoints, management commands, environment variables
+
 ## Pack Output
 
 Exported files land in `Garage64_LATEST/assets/minecraft/optifine/cem/`:

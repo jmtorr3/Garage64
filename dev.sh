@@ -5,6 +5,8 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 echo "Starting backend..."
 cd "$ROOT/backend"
 source venv/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
 python manage.py runserver &
 BACKEND_PID=$!
 
