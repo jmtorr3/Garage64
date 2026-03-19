@@ -6,6 +6,7 @@ services:
       - ./Garage64_LATEST:/pack:ro
     environment:
       - PACK_ROOT=/pack
+      - DB_PATH=/app/db/db.sqlite3
 
   frontend:
     build: ./frontend
