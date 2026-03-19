@@ -179,7 +179,7 @@ export default function UVEditor() {
       setImg(image)
       setTextureSize(declaredSize || [image.naturalWidth, image.naturalHeight])
     }
-    image.src = `/api/asset/?path=${encodeURIComponent(norm)}`
+    image.src = `${import.meta.env.BASE_URL}api/asset/?path=${encodeURIComponent(norm)}`
   }, [mode, attachMeta, bodyData, bodyModelIdx])
 
   const currentEntry = boxes[boxIdx] || null

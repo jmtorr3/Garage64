@@ -22,7 +22,7 @@ export default function Viewer() {
     api.getVariants().then(vs => {
       const target = vs.find(v => v.file_name === 'oak_boat3') || vs[0]
       if (!target) return
-      fetch(`/api/variants/${target.id}/compiled_jem/`)
+      fetch(`${import.meta.env.BASE_URL}api/variants/${target.id}/compiled_jem/`)
         .then(r => r.json())
         .then(setJem)
         .catch(() => {})

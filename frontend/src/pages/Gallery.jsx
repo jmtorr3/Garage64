@@ -70,7 +70,7 @@ export default function Gallery() {
   useEffect(() => {
     if (!selectedId) return
     setViewError(''); setLoading(true); setJem(null)
-    fetch(`/api/variants/${selectedId}/compiled_jem/`)
+    fetch(`${import.meta.env.BASE_URL}api/variants/${selectedId}/compiled_jem/`)
       .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json() })
       .then(data => { setJem(data); setLoading(false) })
       .catch(e => { setViewError(e.message); setLoading(false) })

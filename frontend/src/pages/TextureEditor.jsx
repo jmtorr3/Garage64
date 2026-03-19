@@ -144,7 +144,7 @@ export default function TextureEditor() {
       setStatus('')
     }
     img.onerror = () => setStatus(`Could not load: ${texPath}`)
-    img.src = `/api/asset/?path=${encodeURIComponent(texPath)}`
+    img.src = `${import.meta.env.BASE_URL}api/asset/?path=${encodeURIComponent(texPath)}`
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [texPath])
 

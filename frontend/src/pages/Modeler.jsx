@@ -640,7 +640,7 @@ const [selFace,  setSelFace]  = useState(null)
       uvBufRef.current = buf; redrawUV()
     }
     img.onerror = () => { uvBufRef.current = null; redrawUV() }
-    img.src = `/api/asset/?path=${encodeURIComponent(normTexPath(paths[0]))}`
+    img.src = `${import.meta.env.BASE_URL}api/asset/?path=${encodeURIComponent(normTexPath(paths[0]))}`
   },[dataVer]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -677,7 +677,7 @@ const [selFace,  setSelFace]  = useState(null)
     const loader=new THREE.TextureLoader()
     Promise.all(
       collectTexturePaths(data).map(raw=>new Promise(res=>{
-        loader.load(`/api/asset/?path=${encodeURIComponent(normTexPath(raw))}`,
+        loader.load(`${import.meta.env.BASE_URL}api/asset/?path=${encodeURIComponent(normTexPath(raw))}`,
           tex=>res([raw,tex]), undefined, ()=>res([raw,null]))
       }))
     ).then(entries=>{
@@ -918,7 +918,7 @@ const [selFace,  setSelFace]  = useState(null)
     const paths = collectTexturePaths(b.body_data)
     const entries = await Promise.all(
       paths.map(raw => new Promise(res => {
-        loader.load(`/api/asset/?path=${encodeURIComponent(normTexPath(raw))}`,
+        loader.load(`${import.meta.env.BASE_URL}api/asset/?path=${encodeURIComponent(normTexPath(raw))}`,
           tex => res([raw, tex]), undefined, () => res([raw, null]))
       }))
     )

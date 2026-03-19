@@ -318,7 +318,7 @@ const CemViewer = forwardRef(function CemViewer({
       rawPaths.map(raw =>
         new Promise(resolve => {
           loader.load(
-            `/api/asset/?path=${encodeURIComponent(normTexPath(raw))}`,
+            `${import.meta.env.BASE_URL}api/asset/?path=${encodeURIComponent(normTexPath(raw))}`,
             tex => { tex.userData = { paintPath: normTexPath(raw) }; resolve([raw, tex]) },
             undefined,
             ()  => resolve([raw, null]),

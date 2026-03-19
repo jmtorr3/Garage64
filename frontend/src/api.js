@@ -1,4 +1,4 @@
-const BASE = '/garage64/api'
+const BASE = `${import.meta.env.BASE_URL}api`
 
 async function req(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
@@ -35,7 +35,7 @@ export const api = {
   patchBody: (id, data) => req(`/bodies/${id}/`, { method: 'PATCH', body: data }),
 
   // Assets
-  saveTexture: (path, blob) => fetch(`/garage64/api/asset/?path=${encodeURIComponent(path)}`, {
+  saveTexture: (path, blob) => fetch(`${import.meta.env.BASE_URL}api/asset/?path=${encodeURIComponent(path)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'image/png' },
     body: blob,

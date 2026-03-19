@@ -17,7 +17,7 @@ export default function MusicPlayer() {
 
   function loadDir(dir) {
     setDirErr('')
-    const url = dir ? `/api/music/?dir=${encodeURIComponent(dir)}` : '/api/music/'
+    const url = dir ? `${import.meta.env.BASE_URL}api/music/?dir=${encodeURIComponent(dir)}` : `${import.meta.env.BASE_URL}api/music/`
     fetch(url).then(r => r.json()).then(data => {
       if (data.error) { setDirErr(data.error); return }
       setTracks(data)
@@ -35,7 +35,7 @@ export default function MusicPlayer() {
   useEffect(() => {
     const a = audioRef.current
     if (!a || !track) return
-    a.src = `/api/music/stream/?path=${encodeURIComponent(track.path)}`
+    a.src = `${import.meta.env.BASE_URL}api/music/stream/?path=${encodeURIComponent(track.path)}`
     a.volume = volume
     if (playing) a.play().catch(() => {})
   }, [track]) // eslint-disable-line react-hooks/exhaustive-deps
