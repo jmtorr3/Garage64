@@ -3,7 +3,7 @@ services:
     build: ./backend
     volumes:
       - db_data:/app/db
-      - ./Garage64_LATEST:/pack:ro
+      - ./Garage64_LATEST:/pack
     environment:
       - PACK_ROOT=/pack
       - DB_PATH=/app/db/db.sqlite3
