@@ -392,6 +392,8 @@ export default function Studio() {
     } else if (composeSelItem?.kind === 'part') {
       setTexTargetId(String(composeSelItem.partId))
       setUvPartId(composeSelItem.partId)
+      const p = parts.find(x => x.id === composeSelItem.partId)
+      if (p) setPartSaveName(p.name)
     }
   }, [composeSelItem]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -756,19 +758,26 @@ export default function Studio() {
     if (!partSaveName) { setPartSaveStatus('Enter a part name.'); return }
     const { partObj, partData } = modelerRef.current?.getPartData() ?? {}
     if (!partData) { setPartSaveStatus('No part data.'); return }
+    const editingPart = composeSelItem?.kind === 'part' && !createPartMode
+      ? parts.find(p => p.id === composeSelItem.partId) : null
     const saveBody = createPartMode ? bodies.find(b => b.id === newPartBodyId) || currentBody : currentBody
     const bodyName = saveBody?.name || 'unknown'
-    const jpmPath  = `minecraft:optifine/cem/${bodyName}/parts/${partSaveName}.jpm`
+    const jpmPath  = editingPart ? editingPart.jpm_path : `minecraft:optifine/cem/${bodyName}/parts/${partSaveName}.jpm`
     try {
       const payload = {
         name:            partSaveName,
         jpm_path:        jpmPath,
-        slot:            createPartMode ? newPartSlot : (partObj?.slot || ''),
+        slot:            createPartMode ? newPartSlot : (editingPart?.slot ?? partObj?.slot ?? ''),
         part_data:       partData,
-        attachment_meta: partObj?.attachment_meta || {},
+        attachment_meta: partObj?.attachment_meta || editingPart?.attachment_meta || {},
       }
-      const created = await api.createPart(payload)
-      setParts(ps => [...ps, created])
+      if (editingPart) {
+        const updated = await api.updatePart(editingPart.id, payload)
+        setParts(ps => ps.map(p => p.id === editingPart.id ? updated : p))
+      } else {
+        const created = await api.createPart(payload)
+        setParts(ps => [...ps, created])
+      }
       setPartSaveStatus('ok')
     } catch (e) { setPartSaveStatus(e.message) }
   }
