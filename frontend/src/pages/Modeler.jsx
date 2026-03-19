@@ -185,9 +185,20 @@ function adjustPath(srcPath, tgtPath) {
 
 // ── Outliner ──────────────────────────────────────────────────────────────────
 
-function OutlinerNode({model, modelPath, sel, onSel, onDragStart, onDrop, depth=0, hiddenModels, onToggleVisible}) {
+function OutlinerNode({model, modelPath, sel, onSel, onDragStart, onDrop, depth=0, hiddenModels, onToggleVisible, onRename, onDelete}) {
   const [open,setOpen]=useState(false)
+  const [editing,setEditing]=useState(false)
+  const [editVal,setEditVal]=useState('')
+  const [ctxMenu,setCtxMenu]=useState(null)
   const [dropOver, setDropOver]=useState(false)
+
+  useEffect(()=>{
+    if (!ctxMenu) return
+    function close(){setCtxMenu(null)}
+    window.addEventListener('click',close)
+    window.addEventListener('contextmenu',close)
+    return ()=>{window.removeEventListener('click',close);window.removeEventListener('contextmenu',close)}
+  },[ctxMenu])
   const hoverTimer = useRef(null)
   const indent=depth*14
   const isSel=sel?.kind==='model'&&selKey(sel)===selKey({kind:'model',modelPath})
@@ -223,13 +234,24 @@ function OutlinerNode({model, modelPath, sel, onSel, onDragStart, onDrop, depth=
           background:isSel?'var(--clr-accent)':dropOver?'rgba(100,160,255,0.18)':'transparent',
           color:isSel?'#fff':'var(--clr-text)',
           outline:dropOver?'1px dashed #4488ff':'none', cursor:'grab'}}
-        onClick={()=>onSel({kind:'model',modelPath})}>
+        onClick={()=>onSel({kind:'model',modelPath})}
+        onContextMenu={e=>{e.preventDefault();e.stopPropagation();onSel({kind:'model',modelPath});setCtxMenu({x:e.clientX,y:e.clientY})}}>
         <span style={{fontSize:'9px',width:'10px',color:isSel?'#fff':'var(--clr-text-dim)',flexShrink:0}}
           onClick={e=>{e.stopPropagation();setOpen(v=>!v)}}>
           {hasChildren?(open?'▼':'▶'):' '}
         </span>
         <span style={{color:isSel?'#fff':'#88aaff'}}>{(model.submodels?.length && !model.boxes?.length) ? '📁' : '⬡'}</span>
-        <span style={{flex:1,opacity:isHidden?0.4:1}}>{model.id||model.part||`bone ${modelPath[modelPath.length-1]}`}</span>
+        <span style={{flex:1,opacity:isHidden?0.4:1}}
+          onDoubleClick={e=>{e.stopPropagation();setEditVal(model.id||model.part||'');setEditing(true)}}>
+          {editing
+            ? <input autoFocus value={editVal}
+                style={{background:'var(--bg-panel)',color:'var(--clr-text)',border:'1px solid var(--clr-accent)',borderRadius:2,width:'90%',fontSize:'inherit',padding:'0 2px'}}
+                onChange={e=>setEditVal(e.target.value)}
+                onBlur={()=>{if(editVal.trim()&&onRename)onRename(modelPath,editVal.trim());setEditing(false)}}
+                onKeyDown={e=>{if(e.key==='Enter'){if(editVal.trim()&&onRename)onRename(modelPath,editVal.trim());setEditing(false)}else if(e.key==='Escape'){setEditing(false)}e.stopPropagation()}}
+                onClick={e=>e.stopPropagation()}/>
+            : model.id||model.part||`bone ${modelPath[modelPath.length-1]}`}
+        </span>
         {onToggleVisible&&<span title={isHidden?'Show':'Hide'}
           onClick={e=>{e.stopPropagation();onToggleVisible(modelPath)}}
           style={{marginLeft:'auto',fontSize:'11px',opacity:isHidden?0.35:0.7,cursor:'pointer',paddingRight:'2px',flexShrink:0}}>
@@ -248,9 +270,28 @@ function OutlinerNode({model, modelPath, sel, onSel, onDragStart, onDrop, depth=
         {(model.submodels||[]).map((sub,si)=>(
           <OutlinerNode key={si} model={sub} modelPath={[...modelPath,si]} sel={sel} onSel={onSel}
             onDragStart={onDragStart} onDrop={onDrop} depth={depth+1}
-            hiddenModels={hiddenModels} onToggleVisible={onToggleVisible}/>
+            hiddenModels={hiddenModels} onToggleVisible={onToggleVisible} onRename={onRename} onDelete={onDelete}/>
         ))}
       </>}
+      {ctxMenu&&<div
+        style={{position:'fixed',left:ctxMenu.x,top:ctxMenu.y,zIndex:9999,
+          background:'var(--bg-panel)',border:'1px solid rgba(255,255,255,0.12)',
+          borderRadius:4,padding:'2px 0',boxShadow:'2px 4px 16px rgba(0,0,0,0.5)',minWidth:160}}
+        onClick={e=>e.stopPropagation()}>
+        <div style={{padding:'5px 14px',cursor:'pointer',fontSize:'12px'}}
+          onMouseEnter={e=>e.currentTarget.style.background='var(--clr-accent)'}
+          onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+          onClick={()=>{setCtxMenu(null);setEditVal(model.id||model.part||'');setEditing(true)}}>
+          Rename
+        </div>
+        <div style={{height:1,background:'rgba(255,255,255,0.1)',margin:'2px 0'}}/>
+        <div style={{padding:'5px 14px',cursor:'pointer',fontSize:'12px',color:'#f77'}}
+          onMouseEnter={e=>e.currentTarget.style.background='rgba(255,80,80,0.15)'}
+          onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+          onClick={()=>{setCtxMenu(null);onDelete&&onDelete(modelPath)}}>
+          Delete
+        </div>
+      </div>}
     </div>
   )
 }
@@ -316,7 +357,7 @@ function Vec3Input({label, value=[0,0,0], step=0.5, onChange}) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBodyId, onBack, embedded = false, sharedViewerRef = null, texturePatch = null, showBodyPreview = null, previewParts = null, onBarUpdate = null, showGridProp = null } = {}, ref) {
+const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBodyId, onBack, embedded = false, sharedViewerRef = null, texturePatch = null, showBodyPreview = null, previewParts = null, onBarUpdate = null, showGridProp = null, newPart = false } = {}, ref) {
   const [searchParams] = useSearchParams()
   const { isDark } = useTheme()
   const bg = isDark ? '#1e1e1e' : '#ece9d8'
@@ -398,10 +439,25 @@ const [selFace,  setSelFace]  = useState(null)
     if (initPartId) {
       setEditMode('part')
       setPartId(initPartId)
+    } else if (newPart) {
+      setEditMode('part')
+      setPartId(null)
+      setShowBody(false)
+      partObjRef.current = null
+      dataRef.current = { models: [] }
+      texMapRef.current = {}
+      undoStackRef.current = []; redoStackRef.current = []
+      setDataVer(v=>v+1); setDirty(false); setSel(null)
+      removeBodyPreview()
+      if (ctxRef.current) {
+        const ctx = ctxRef.current
+        ctx.tc.detach()
+        if (ctx.modelGroup) { ctx.scene.remove(ctx.modelGroup); disposeGroup(ctx.modelGroup); ctx.modelGroup = null }
+      }
     } else {
       setEditMode('body')
     }
-  },[embedded, initPartId])  // eslint-disable-line react-hooks/exhaustive-deps
+  },[embedded, initPartId, newPart])  // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(()=>{
     if (!embedded || !initBodyId) return
@@ -411,13 +467,16 @@ const [selFace,  setSelFace]  = useState(null)
   // ── Load body data ──────────────────────────────────────────────────────────
   useEffect(()=>{
     if (!bodyId || editMode !== 'body') return
+    let cancelled = false
     api.getBody(bodyId).then(b=>{
+      if (cancelled) return
       dataRef.current=b.body_data; origRef.current=b.body_data
       undoStackRef.current=[]; redoStackRef.current=[]
       if (ctxRef.current && !embedded) ctxRef.current.firstLoad=true
       setDataVer(v=>v+1); setDirty(false); setSel(null); setStatus('')
       loadTexAndRebuild(b.body_data)
     })
+    return () => { cancelled = true }
   },[bodyId, editMode])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load part data ──────────────────────────────────────────────────────────
@@ -466,8 +525,9 @@ const [selFace,  setSelFace]  = useState(null)
       tc,
       grid: extCtx.grid,
       modelGroup: null,
-      firstLoad: false,
+      firstLoad: newPart,
     }
+    if (newPart) rebuildScene()
 
     sharedViewerRef.current.setClickHandler(onViewportClick)
     sharedViewerRef.current.setDblClickHandler(() => {
@@ -642,15 +702,20 @@ const [selFace,  setSelFace]  = useState(null)
 
     const group=buildSceneRoot(data,texMapRef.current)
     const box=new THREE.Box3().setFromObject(group)
-    const center=box.getCenter(new THREE.Vector3())
-    group.position.x -= center.x
-    group.position.z -= center.z
-    group.position.y -= box.min.y
-    const modelHeight=box.max.y-box.min.y
-    ctx.orbit.target.set(0, modelHeight/2, 0)
-    if (ctx.firstLoad) {
-      const size=box.getSize(new THREE.Vector3()).length()
-      ctx.camera.position.set(size*.8,size*.6,size*1.2); ctx.orbit.update(); ctx.firstLoad=false
+    if (!box.isEmpty()) {
+      const center=box.getCenter(new THREE.Vector3())
+      group.position.x -= center.x
+      group.position.z -= center.z
+      group.position.y -= box.min.y
+      const modelHeight=box.max.y-box.min.y
+      ctx.orbit.target.set(0, modelHeight/2, 0)
+      if (ctx.firstLoad) {
+        const size=box.getSize(new THREE.Vector3()).length()
+        ctx.camera.position.set(size*.8,size*.6,size*1.2); ctx.orbit.update(); ctx.firstLoad=false
+      }
+    } else if (ctx.firstLoad) {
+      ctx.orbit.target.set(0, 8, 0)
+      ctx.camera.position.set(20, 15, 25); ctx.orbit.update(); ctx.firstLoad=false
     }
     ctx.scene.add(group); ctx.modelGroup=group
 
@@ -926,11 +991,31 @@ const [selFace,  setSelFace]  = useState(null)
   }
 
   function addCube() {
-    const path=sel?.kind==='model' ? sel.modelPath : (dataRef.current?.models?.length ? [0] : null)
-    if (!path||!dataRef.current) return
+    if (!dataRef.current) return
+    if (!dataRef.current.models?.length) {
+      bump([{ id: 'root', boxes: [{coordinates:[0,0,0,4,4,4],textureOffset:[0,0]}], submodels: [] }])
+      return
+    }
+    const path=sel?.kind==='model' ? sel.modelPath : [0]
     bump(updateNode(dataRef.current.models,path,n=>({
       ...n, boxes:[...(n.boxes||[]),{coordinates:[0,0,0,4,4,4],textureOffset:[0,0]}]
     })))
+  }
+
+  function deleteModel(path) {
+    if (!path||!dataRef.current) return
+    pushUndo()
+    const clone=JSON.parse(JSON.stringify(dataRef.current.models))
+    if (path.length===1) {
+      clone.splice(path[0],1)
+    } else {
+      let parent=clone[path[0]]
+      for (let i=1;i<path.length-1;i++) parent=parent.submodels[path[i]]
+      parent.submodels.splice(path[path.length-1],1)
+    }
+    dataRef.current={...dataRef.current,models:clone}
+    setDataVer(v=>v+1); setDirty(true)
+    clearSel()
   }
 
   function deleteSelected() {
@@ -940,7 +1025,13 @@ const [selFace,  setSelFace]  = useState(null)
         const boxes=[...(n.boxes||[])]; boxes.splice(sel.boxIdx,1); return {...n,boxes}
       }))
       clearSel()
+    } else if (sel.kind==='model') {
+      deleteModel(sel.modelPath)
     }
+  }
+
+  function handleRename(modelPath, newName) {
+    bump(updateNode(dataRef.current.models,modelPath,n=>({...n,id:newName})))
   }
 
   async function save() {
@@ -1141,7 +1232,7 @@ const [selFace,  setSelFace]  = useState(null)
           <div style={{flex:1,overflowY:'auto',display:'flex',flexDirection:'column'}}>
             <div style={{flex:1}}>
               {(data?.models||[]).map((model,mi)=>(
-                <OutlinerNode key={mi} model={model} modelPath={[mi]} sel={sel} onSel={selectAndAttach} onDragStart={handleDragStart} onDrop={handleDrop} depth={0} hiddenModels={hiddenModels} onToggleVisible={toggleModelVisible}/>
+                <OutlinerNode key={mi} model={model} modelPath={[mi]} sel={sel} onSel={selectAndAttach} onDragStart={handleDragStart} onDrop={handleDrop} depth={0} hiddenModels={hiddenModels} onToggleVisible={toggleModelVisible} onRename={handleRename} onDelete={deleteModel}/>
               ))}
             </div>
             {/* Root drop zone — drag here to move a model back to top level */}

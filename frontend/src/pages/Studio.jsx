@@ -161,7 +161,8 @@ export default function Studio() {
   const { isDark } = useTheme()
   const bg = isDark ? '#1e1e1e' : '#ece9d8'
 
-  const partEditMode = searchParams.get('newPart') === '1'  // arrived from Parts Library
+  const [createPartMode, setCreatePartMode] = useState(false)
+  const partEditMode = searchParams.get('newPart') === '1' || createPartMode  // arrived from Parts Library or folder ctx menu
 
   const [texEditorMode, setTexEditorMode] = useState(false)
   const [modelerMode, setModelerMode] = useState(null) // null | { partId, bodyId }
@@ -557,7 +558,6 @@ export default function Studio() {
 
   function switchEditTab(tab) {
     if (texPath && bufRef.current) setTexturePatch({ path: texPath, canvas: bufRef.current })
-    if (texDirty && texPath && bufRef.current) texSaveRef.current?.()
     setEditTab(tab)
   }
 
@@ -725,6 +725,13 @@ export default function Studio() {
   function toggleExtra(partId) {
     setExtraSel(prev => { const n=new Set(prev); n.has(partId)?n.delete(partId):n.add(partId); return n })
   }
+  function handleCreatePartFromFolder(folderName) {
+    setCreatePartMode(true)
+    setPartSaveName(folderName)
+    setComposeSelItem(null)
+    switchEditTab('modeler')
+  }
+
   async function savePartFromEditor() {
     setPartSaveStatus('')
     if (!partSaveName) { setPartSaveStatus('Enter a part name.'); return }
@@ -961,7 +968,7 @@ export default function Studio() {
               <div style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
                 <div style={{ ...XP_TITLE, display:'flex', alignItems:'center', gap:'6px' }}>
                   <button style={{ ...s.btnSm, fontSize:'9px', padding:'1px 6px' }}
-                    onClick={() => navigate('/parts-library')}>←</button>
+                    onClick={() => createPartMode ? setCreatePartMode(false) : navigate('/parts-library')}>←</button>
                   <span style={{ flex:1 }}>Editing Part</span>
                 </div>
                 <div style={{ flex:1, overflowY:'auto', padding:'6px' }}>
@@ -1044,12 +1051,18 @@ export default function Studio() {
                   {showSlotViewer[slot.name] !== false && <div style={s.miniViewer}>
                     {miniJem
                       ? <CemViewer key={`${slot.id}-${viewerVer}`} jem={miniJem} onError={()=>{}} autoRotate sidebarOffset={0} showGrid={false} showAxes={false} fitScale={0.55} enableZoom={false} bgColor={bg} />
-                      : <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.25)', fontSize:'10px', fontFamily:'Monocraft, sans-serif' }}>Create New Part</div>
+                      : <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--clr-accent)', fontSize:'10px', fontFamily:'Monocraft, sans-serif', cursor:'pointer', opacity:0.6 }}
+                          onClick={e=>{e.stopPropagation();handleCreatePartFromFolder(slot.name)}}>Create New Part</div>
                     }
                   </div>}
                   <div style={s.slotNav}>
                     <button style={s.slotNavBtn} onClick={() => stepSlotPart(slot.name, -1)}>◀</button>
-                    <span style={s.partLabel}>{selPart?.name ?? 'Create New Part'}</span>
+                    {selPart
+                      ? <span style={s.partLabel}>{selPart.name}</span>
+                      : <span style={{...s.partLabel, cursor:'pointer', color:'var(--clr-accent)', textDecoration:'underline'}}
+                          onClick={e=>{e.stopPropagation();handleCreatePartFromFolder(slot.name)}}>
+                          Create New Part
+                        </span>}
                     {selPart && (
                       <div style={s.editBtns}>
                         <button style={s.editBtn} title="Edit texture" onClick={() => { setUvPartId(selPart.id); setEditTab('texture') }}>Tex</button>
@@ -1182,7 +1195,7 @@ export default function Studio() {
 
           {/* 3D viewer */}
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          {centerJem
+          {(centerJem || editTab === 'modeler')
             ? <CemViewer ref={viewerRef} jem={editTab === 'modeler' ? null : (partEditMode ? centerJem : viewerJem)} onError={()=>{}} showGrid={showGrid} showAxes={false} bgColor={bg}
                 initialCamera={initialCamera} showNavCube
                 enablePaint={editTab !== 'modeler' && !!texPath && tool !== 'drag'} onPaintUV={onPaintUV} texturePatch={texturePatch} paintTexPath={texPath} />
@@ -1226,9 +1239,11 @@ export default function Studio() {
             <Modeler ref={modelerRef} sharedViewerRef={viewerRef} embedded texturePatch={texturePatch}
               bodyId={bodyId}
               partId={composeSelItem?.kind === 'part' ? composeSelItem.partId : null}
+              newPart={createPartMode && !composeSelItem}
               onBack={() => switchEditTab('texture')}
               onBarUpdate={setModelerBar}
-              showGridProp={showGrid} />
+              showGridProp={showGrid}
+              />
           ) : (
           <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'0', background:'var(--bg-panel)', minHeight:0 }}>
 
