@@ -80,7 +80,7 @@ export default function Gallery() {
 
   // ── form helpers ──────────────────────────────────────────────────────────────
   function openNew() {
-    navigate('/studio')
+    navigate('/studio?new=1')
   }
 
   function openEdit(v) {

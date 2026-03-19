@@ -165,7 +165,6 @@ export default function Studio() {
   const partEditMode = searchParams.get('newPart') === '1' || createPartMode  // arrived from Parts Library or folder ctx menu
 
   const [texEditorMode, setTexEditorMode] = useState(false)
-  const [modelerMode, setModelerMode] = useState(null) // null | { partId, bodyId }
   const [showGrid, setShowGrid] = useState(true)
   const [modelerBar, setModelerBar] = useState({ tcMode: 'translate', showGrid: false, hasSel: false, undoCount: 0, redoCount: 0 })
 
@@ -183,6 +182,11 @@ export default function Studio() {
   const [saveStatus, setSaveStatus] = useState('')
   const [partSaveName,  setPartSaveName]  = useState('')
   const [partSaveStatus, setPartSaveStatus] = useState('')
+  const [newTexSize, setNewTexSize] = useState([64, 32])
+  const [newPartSlot, setNewPartSlot] = useState('')
+  const [newPartBodyId, setNewPartBodyId] = useState(null)
+  const [showNewBody, setShowNewBody] = useState(false)
+  const [newBodyName, setNewBodyName] = useState('')
   const [showManage,   setShowManage]   = useState(false)
   const [showCompose,  setShowCompose]  = useState(true)
   const [showBodyViewer,  setShowBodyViewer]  = useState(true)
@@ -292,8 +296,8 @@ export default function Studio() {
           setEditTab('modeler')
           setPartSaveName(preset.name)
         }
-      } else if (!searchParams.get('variantId')) {
-        // Template: pre-select first part from each slot when creating new
+      } else if (!searchParams.get('variantId') && !searchParams.get('new')) {
+        // Template: pre-select first part from each slot when coming from presetPartId flow
         const template = {}
         for (const p of ps) {
           if (p.slot && !template[p.slot]) template[p.slot] = p.id
@@ -441,6 +445,23 @@ export default function Studio() {
     img.src = `/api/asset/?path=${encodeURIComponent(texPath)}`
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [texPath])
+
+  // ── Blank texture for new part creation ───────────────────────────────────────
+  function initNewPartTexture(w, h) {
+    const buf = document.createElement('canvas')
+    buf.width = w; buf.height = h
+    bufRef.current = buf
+    undoRef.current = []; redoRef.current = []
+    setUndoCount(0); setRedoCount(0)
+    setZoom(Math.max(1, Math.floor(340 / w)))
+    setTexPath('')
+    setTexStatus('New texture — use Save As to name it')
+  }
+
+  useEffect(() => {
+    if (!createPartMode || editTab !== 'texture' || bufRef.current) return
+    initNewPartTexture(newTexSize[0], newTexSize[1])
+  }, [createPartMode, editTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Texture logic ─────────────────────────────────────────────────────────────
   const redraw = useCallback(() => {
@@ -717,17 +738,15 @@ export default function Studio() {
     const idx = opts.indexOf(slotSel[slotName] || null)
     setSlotSel(prev => ({ ...prev, [slotName]: opts[(idx + dir + opts.length) % opts.length] }))
   }
-  function stepBody(dir) {
-    if (!bodies.length) return
-    const idx = bodies.findIndex(b => b.id === bodyId)
-    setBodyId(bodies[(idx + dir + bodies.length) % bodies.length].id)
-  }
+
   function toggleExtra(partId) {
     setExtraSel(prev => { const n=new Set(prev); n.has(partId)?n.delete(partId):n.add(partId); return n })
   }
   function handleCreatePartFromFolder(folderName) {
     setCreatePartMode(true)
     setPartSaveName(folderName)
+    setNewPartSlot(folderName)
+    setNewPartBodyId(bodyId)
     setComposeSelItem(null)
     switchEditTab('modeler')
   }
@@ -737,13 +756,14 @@ export default function Studio() {
     if (!partSaveName) { setPartSaveStatus('Enter a part name.'); return }
     const { partObj, partData } = modelerRef.current?.getPartData() ?? {}
     if (!partData) { setPartSaveStatus('No part data.'); return }
-    const bodyName = currentBody?.name || 'unknown'
+    const saveBody = createPartMode ? bodies.find(b => b.id === newPartBodyId) || currentBody : currentBody
+    const bodyName = saveBody?.name || 'unknown'
     const jpmPath  = `minecraft:optifine/cem/${bodyName}/parts/${partSaveName}.jpm`
     try {
       const payload = {
         name:            partSaveName,
         jpm_path:        jpmPath,
-        slot:            partObj?.slot || '',
+        slot:            createPartMode ? newPartSlot : (partObj?.slot || ''),
         part_data:       partData,
         attachment_meta: partObj?.attachment_meta || {},
       }
@@ -850,15 +870,6 @@ export default function Studio() {
 
   // ── Render ────────────────────────────────────────────────────────────────────
   const texBuf = bufRef.current
-
-  // ── Modeler mode ────────────────────────────────────────────────────────────
-  if (modelerMode) return (
-    <Modeler
-      partId={modelerMode.partId}
-      bodyId={modelerMode.bodyId}
-      onBack={() => setModelerMode(null)}
-    />
-  )
 
   // ── Texture editor full-screen mode ────────────────────────────────────────
   if (texEditorMode) return (
@@ -969,7 +980,7 @@ export default function Studio() {
                 <div style={{ ...XP_TITLE, display:'flex', alignItems:'center', gap:'6px' }}>
                   <button style={{ ...s.btnSm, fontSize:'9px', padding:'1px 6px' }}
                     onClick={() => createPartMode ? setCreatePartMode(false) : navigate('/parts-library')}>←</button>
-                  <span style={{ flex:1 }}>Editing Part</span>
+                  <span style={{ flex:1 }}>{createPartMode ? 'Creating New Part' : 'Editing Part'}</span>
                 </div>
                 <div style={{ flex:1, overflowY:'auto', padding:'6px' }}>
                   {editingPart ? (
@@ -983,6 +994,22 @@ export default function Studio() {
                       <div style={{ padding:'6px 8px' }}>
                         <div style={{ fontSize:'11px', fontWeight:'bold', color:'var(--clr-text)', fontFamily:'Monocraft, sans-serif', marginBottom:'3px' }}>{editingPart.name}</div>
                         <div style={{ fontSize:'9px', color:'var(--clr-text-dim)', fontFamily:'monospace', wordBreak:'break-all' }}>{editingPart.jpm_path}</div>
+                      </div>
+                    </div>
+                  ) : createPartMode ? (
+                    <div style={{ padding:'8px', display:'flex', flexDirection:'column', gap:'12px' }}>
+                      <div>
+                        <div style={s.label}>Car Body</div>
+                        <select style={s.select} value={newPartBodyId ?? ''} onChange={e => setNewPartBodyId(Number(e.target.value))}>
+                          {bodies.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <div style={s.label}>Category</div>
+                        <select style={s.select} value={newPartSlot} onChange={e => setNewPartSlot(e.target.value)}>
+                          <option value="">Standalone (no category)</option>
+                          {slots.map(sl => <option key={sl.id} value={sl.name}>{sl.display_name}</option>)}
+                        </select>
                       </div>
                     </div>
                   ) : (
@@ -1020,17 +1047,37 @@ export default function Studio() {
               {showBodyViewer && <div style={s.miniViewer}>
                 {bodyMiniJem
                   ? <CemViewer key={viewerVer} jem={bodyMiniJem} onError={()=>{}} autoRotate sidebarOffset={0} showGrid={false} showAxes={false} fitScale={0.55} enableZoom={false} bgColor={bg} />
-                  : <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.25)', fontSize:'10px', fontFamily:'Monocraft, sans-serif' }}>no body</div>
+                  : <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--clr-accent)', fontSize:'10px', fontFamily:'Monocraft, sans-serif', cursor:'pointer', opacity:0.7 }}
+                      onClick={e=>{e.stopPropagation();setShowNewBody(true)}}>Create New Body</div>
                 }
               </div>}
               <div style={s.slotNav}>
-                <button style={s.slotNavBtn} onClick={() => stepBody(-1)}>◀</button>
-                <span style={s.partLabel}>{currentBody?.name ?? '—'}</span>
-                <div style={s.editBtns}>
-                  <button style={s.editBtn} title="Edit texture" onClick={() => { setUvPartId(null); setEditTab('texture') }}>Tex</button>
-                  <button style={s.editBtn} title="Edit Model" onClick={() => setModelerMode({ bodyId })}>3D</button>
-                </div>
-                <button style={s.slotNavBtn} onClick={() => stepBody(1)}>▶</button>
+                {showNewBody
+                  ? <form style={{display:'flex',gap:'3px',flex:1,alignItems:'center'}} onSubmit={async e=>{
+                      e.preventDefault();e.stopPropagation()
+                      if(!newBodyName.trim())return
+                      try{const b=await api.createBody({name:newBodyName.trim(),body_data:{models:[],texture:'',textureSize:[64,32]}});setBodies(bs=>[...bs,b]);setBodyId(b.id);setShowNewBody(false);setNewBodyName('')}catch(err){alert(err.message)}
+                    }} onClick={e=>e.stopPropagation()}>
+                      <input autoFocus style={{...s.input,flex:1,fontSize:'10px'}} placeholder="body name" value={newBodyName} onChange={e=>setNewBodyName(e.target.value)}/>
+                      <button type="submit" style={s.editBtn}>✓</button>
+                      <button type="button" style={s.editBtn} onClick={()=>{setShowNewBody(false);setNewBodyName('')}}>✕</button>
+                    </form>
+                  : <>
+                      <select
+                        style={{...s.select, flex:1, fontSize:'10px'}}
+                        value={bodyId ?? ''}
+                        onClick={e=>e.stopPropagation()}
+                        onChange={e=>{e.stopPropagation();setBodyId(e.target.value ? Number(e.target.value) : null)}}
+                      >
+                        <option value=''>— none —</option>
+                        {bodies.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
+                      </select>
+                      <div style={s.editBtns}>
+                        <button style={s.editBtn} title="Create new body" onClick={e=>{e.stopPropagation();setShowNewBody(true)}}>+</button>
+                        <button style={s.editBtn} title="Edit body" onClick={e=>{e.stopPropagation();setComposeSelItem({kind:'body'});switchEditTab('modeler')}}>Edit</button>
+                      </div>
+                    </>
+                }
               </div>
             </div>
 
@@ -1065,8 +1112,7 @@ export default function Studio() {
                         </span>}
                     {selPart && (
                       <div style={s.editBtns}>
-                        <button style={s.editBtn} title="Edit texture" onClick={() => { setUvPartId(selPart.id); setEditTab('texture') }}>Tex</button>
-                        <button style={s.editBtn} title="Edit Model" onClick={() => setModelerMode({ partId: selPart.id, bodyId })}>3D</button>
+                        <button style={s.editBtn} title="Edit part" onClick={e=>{e.stopPropagation();setComposeSelItem({kind:'part',partId:selPart.id});switchEditTab('modeler')}}>Edit</button>
                       </div>
                     )}
                     <button style={s.slotNavBtn} onClick={() => stepSlotPart(slot.name, 1)}>▶</button>
@@ -1090,8 +1136,7 @@ export default function Studio() {
                         <span style={extraSel.has(p.id) ? s.radioActive : s.radioInact}>{p.name}</span>
                       </div>
                       <div style={s.editBtns} onClick={e => e.stopPropagation()}>
-                        <button style={s.editBtn} title="Edit texture" onClick={() => { setUvPartId(p.id); setEditTab('texture') }}>Tex</button>
-                        <button style={s.editBtn} title="Edit Model" onClick={() => setModelerMode({ partId: p.id, bodyId })}>3D</button>
+                        <button style={s.editBtn} title="Edit part" onClick={e=>{e.stopPropagation();setComposeSelItem({kind:'part',partId:p.id});switchEditTab('modeler')}}>Edit</button>
                       </div>
                     </div>
                   ))}
@@ -1202,7 +1247,7 @@ export default function Studio() {
             : <div style={{ color:'var(--clr-text-dim)', padding:'2rem', fontSize:'0.9rem' }}>Select a body to preview.</div>}
           {/* Viewer toggle bar */}
           <div style={{ position:'absolute', top:'10px', left:'10px', display:'flex', flexDirection:'column', gap:'4px', alignItems:'flex-start' }}>
-            {(bodyMiniJem || activeParts.length > 0) && (
+            {!createPartMode && (bodyMiniJem || activeParts.length > 0) && (
               <div style={{ display:'flex', gap:'3px', background:'rgba(0,0,0,0.65)', borderRadius:'4px', padding:'3px 6px', maxWidth:'90vw', overflowX:'auto' }}>
                 <button style={{ ...s.btnSm, whiteSpace:'nowrap', ...(composeSelItem?.kind==='body' ? { background:'var(--clr-accent)', color:'#fff' } : {}) }}
                   onClick={() => setComposeSelItem({kind:'body'})}>Body</button>
@@ -1261,6 +1306,19 @@ export default function Studio() {
                 </select>
               )}
             </div>
+
+            {/* ── New part texture size picker ── */}
+            {createPartMode && <div style={{ padding:'4px 6px 6px', borderBottom:'1px solid var(--bdr-dk)', flexShrink:0 }}>
+              <div style={{ fontSize:'10px', color:'var(--clr-text-dim)', marginBottom:'4px', fontFamily:'Monocraft, sans-serif' }}>Texture Size</div>
+              <div style={{ display:'flex', gap:'4px', alignItems:'center' }}>
+                <input type="number" style={{ ...s.input, width:'44px' }} value={newTexSize[0]}
+                  onChange={e => setNewTexSize(v => [Number(e.target.value)||v[0], v[1]])} min={1} max={512} />
+                <span style={{ fontSize:'10px', color:'var(--clr-text-dim)' }}>×</span>
+                <input type="number" style={{ ...s.input, width:'44px' }} value={newTexSize[1]}
+                  onChange={e => setNewTexSize(v => [v[0], Number(e.target.value)||v[1]])} min={1} max={512} />
+                <button style={s.btnSm} onClick={() => { bufRef.current = null; initNewPartTexture(newTexSize[0], newTexSize[1]) }}>New</button>
+              </div>
+            </div>}
 
             {/* ── TEXTURE PAINTER ── */}
             <div style={{ ...XP_TITLE, flexShrink:0 }}>Texture Painter{texDirty ? ' *' : ''}</div>

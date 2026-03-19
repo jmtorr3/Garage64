@@ -30,6 +30,7 @@ export const api = {
   // Bodies
   getBodies: () => req('/bodies/'),
   getBody: (id) => req(`/bodies/${id}/`),
+  createBody: (data) => req('/bodies/', { method: 'POST', body: data }),
   updateBody: (id, data) => req(`/bodies/${id}/`, { method: 'PUT', body: data }),
   patchBody: (id, data) => req(`/bodies/${id}/`, { method: 'PATCH', body: data }),
 
