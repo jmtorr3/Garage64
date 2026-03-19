@@ -991,9 +991,21 @@ export default function Studio() {
                           : <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.25)', fontSize:'10px', fontFamily:'Monocraft, sans-serif' }}>no preview</div>
                         }
                       </div>
-                      <div style={{ padding:'6px 8px' }}>
-                        <div style={{ fontSize:'11px', fontWeight:'bold', color:'var(--clr-text)', fontFamily:'Monocraft, sans-serif', marginBottom:'3px' }}>{editingPart.name}</div>
+                      <div style={{ padding:'6px 8px', display:'flex', flexDirection:'column', gap:'6px' }}>
+                        <div style={{ fontSize:'11px', fontWeight:'bold', color:'var(--clr-text)', fontFamily:'Monocraft, sans-serif' }}>{editingPart.name}</div>
                         <div style={{ fontSize:'9px', color:'var(--clr-text-dim)', fontFamily:'monospace', wordBreak:'break-all' }}>{editingPart.jpm_path}</div>
+                        <div>
+                          <div style={s.label}>Category</div>
+                          <select style={s.select} value={editingPart.slot || ''}
+                            onChange={async e => {
+                              const slot = e.target.value
+                              await api.patchPart(editingPart.id, { slot })
+                              setParts(ps => ps.map(p => p.id === editingPart.id ? { ...p, slot } : p))
+                            }}>
+                            <option value="">Standalone (no category)</option>
+                            {slots.map(sl => <option key={sl.id} value={sl.name}>{sl.display_name}</option>)}
+                          </select>
+                        </div>
                       </div>
                     </div>
                   ) : createPartMode ? (
