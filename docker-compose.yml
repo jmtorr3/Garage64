@@ -2,8 +2,8 @@ services:
   backend:
     build: ./backend
     volumes:
-      - db_data:/app/db.sqlite3
-      - pack_data:/pack
+      - db_data:/app/db
+      - ./Garage64_LATEST:/pack:ro
     environment:
       - PACK_ROOT=/pack
 
@@ -16,4 +16,3 @@ services:
 
 volumes:
   db_data:
-  pack_data:
