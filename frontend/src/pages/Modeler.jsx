@@ -1011,45 +1011,79 @@ const [selFace,  setSelFace]  = useState(null)
     return null
   }
 
-  function patchBoxLive(updater) {
-    if (!selRef.current || selRef.current.kind !== 'box' || !dataRef.current) return
-    const { modelPath, boxIdx } = selRef.current
-    dataRef.current = {
-      ...dataRef.current,
-      models: updateNode(dataRef.current.models, modelPath, n => {
-        const boxes = [...(n.boxes||[])]
-        boxes[boxIdx] = updater(boxes[boxIdx])
-        return {...n, boxes}
-      })
+  // Collect all { modelPath, boxIdx, box } from a selection item (box or model/folder)
+  function collectSelBoxes(s) {
+    if (!dataRef.current) return []
+    if (s.kind === 'box') {
+      const box = getNode(dataRef.current.models, s.modelPath)?.boxes?.[s.boxIdx]
+      return box ? [{ modelPath: s.modelPath, boxIdx: s.boxIdx, box }] : []
     }
-    redrawUVRef.current?.()
+    if (s.kind === 'model') {
+      const node = getNode(dataRef.current.models, s.modelPath)
+      if (!node) return []
+      function walk(model, path) {
+        const out = []
+        ;(model.boxes||[]).forEach((b,i) => out.push({ modelPath: path, boxIdx: i, box: b }))
+        ;(model.submodels||[]).forEach((sub,i) => out.push(...walk(sub, [...path, i])))
+        return out
+      }
+      return walk(node, s.modelPath)
+    }
+    return []
   }
 
   function onUVMouseDown(e) {
     if (e.button !== 0) return
     const buf = uvBufRef.current; if (!buf) return
-    const cur = selRef.current
-    const box = cur?.kind === 'box'
-      ? getNode(dataRef.current?.models, cur.modelPath)?.boxes?.[cur.boxIdx]
-      : null
-    if (!box) return
-
     const zoom = uvZoomRef.current
     const rect = uvCanvasRef.current.getBoundingClientRect()
     const px = (e.clientX - rect.left) / zoom
     const py = (e.clientY - rect.top)  / zoom
 
-    const hitFace = getUVHit(px, py, box)
-    if (!hitFace) return
+    const allSel = multiSelRef.current.length ? multiSelRef.current : (selRef.current ? [selRef.current] : [])
+    // Deduplicate boxes
+    const seen = new Set()
+    const allBoxes = []
+    for (const s of allSel) {
+      for (const it of collectSelBoxes(s)) {
+        const k = `${it.modelPath.join('_')}_${it.boxIdx}`
+        if (!seen.has(k)) { seen.add(k); allBoxes.push(it) }
+      }
+    }
+    if (!allBoxes.length) return
 
     const origData = JSON.stringify(dataRef.current)
 
-    if (box.textureOffset) {
-      uvDragRef.current = { startPx: px, startPy: py, startVal: [...box.textureOffset], mode: 'offset', origData }
+    if (allBoxes.length === 1) {
+      // Single box: face-level drag (click must land on a rect)
+      const { box, modelPath, boxIdx } = allBoxes[0]
+      const hitFace = getUVHit(px, py, box)
+      if (!hitFace) return
+      if (box.textureOffset) {
+        uvDragRef.current = { startPx: px, startPy: py, origData, items: [{ modelPath, boxIdx, mode: 'offset', startVal: [...box.textureOffset] }] }
+      } else {
+        const key = 'uv' + hitFace[0].toUpperCase() + hitFace.slice(1)
+        setSelFace(hitFace)
+        uvDragRef.current = { startPx: px, startPy: py, origData, items: [{ modelPath, boxIdx, mode: 'face', face: hitFace, startVal: [...(box[key]||[0,0,0,0])] }] }
+      }
     } else {
-      const key = 'uv' + hitFace[0].toUpperCase() + hitFace.slice(1)
-      setSelFace(hitFace)
-      uvDragRef.current = { startPx: px, startPy: py, startVal: [...(box[key]||[0,0,0,0])], face: hitFace, mode: 'face', origData }
+      // Multi: move all boxes together (both offset-mode and per-face)
+      if (!allBoxes.length) return
+      uvDragRef.current = {
+        startPx: px, startPy: py, origData,
+        items: allBoxes.map(it => {
+          if (it.box.textureOffset) {
+            return { modelPath: it.modelPath, boxIdx: it.boxIdx, mode: 'offset', startVal: [...it.box.textureOffset] }
+          }
+          // Per-face: snapshot all 6 face coords so we can shift them uniformly
+          const faceCoords = {}
+          for (const f of FACES) {
+            const k = 'uv'+f[0].toUpperCase()+f.slice(1)
+            if (it.box[k]) faceCoords[f] = [...it.box[k]]
+          }
+          return { modelPath: it.modelPath, boxIdx: it.boxIdx, mode: 'allfaces', faceCoords }
+        })
+      }
     }
     setUvCursor('grabbing')
   }
@@ -1063,7 +1097,7 @@ const [selFace,  setSelFace]  = useState(null)
 
     const drag = uvDragRef.current
     if (!drag) {
-      // Update hover cursor
+      // Hover cursor — single primary box only
       const cur = selRef.current
       const box = cur?.kind === 'box'
         ? getNode(dataRef.current?.models, cur.modelPath)?.boxes?.[cur.boxIdx]
@@ -1074,14 +1108,30 @@ const [selFace,  setSelFace]  = useState(null)
 
     const dx = Math.round(px - drag.startPx)
     const dy = Math.round(py - drag.startPy)
-
-    if (drag.mode === 'offset') {
-      patchBoxLive(b => ({...b, textureOffset: [drag.startVal[0]+dx, drag.startVal[1]+dy]}))
-    } else {
-      const [x1,y1,x2,y2] = drag.startVal
-      const key = 'uv' + drag.face[0].toUpperCase() + drag.face.slice(1)
-      patchBoxLive(b => ({...b, [key]: [x1+dx, y1+dy, x2+dx, y2+dy]}))
+    let models = dataRef.current.models
+    for (const it of drag.items) {
+      models = updateNode(models, it.modelPath, n => {
+        const boxes = [...(n.boxes||[])]
+        if (it.mode === 'offset') {
+          boxes[it.boxIdx] = { ...boxes[it.boxIdx], textureOffset: [it.startVal[0]+dx, it.startVal[1]+dy] }
+        } else if (it.mode === 'face' && it.face && it.startVal) {
+          const key = 'uv' + it.face[0].toUpperCase() + it.face.slice(1)
+          const [x1,y1,x2,y2] = it.startVal
+          boxes[it.boxIdx] = { ...boxes[it.boxIdx], [key]: [x1+dx, y1+dy, x2+dx, y2+dy] }
+        } else if (it.mode === 'allfaces') {
+          const updated = { ...boxes[it.boxIdx] }
+          for (const [f, coords] of Object.entries(it.faceCoords)) {
+            const key = 'uv'+f[0].toUpperCase()+f.slice(1)
+            const [x1,y1,x2,y2] = coords
+            updated[key] = [x1+dx, y1+dy, x2+dx, y2+dy]
+          }
+          boxes[it.boxIdx] = updated
+        }
+        return { ...n, boxes }
+      })
     }
+    dataRef.current = { ...dataRef.current, models }
+    redrawUVRef.current?.()
   }
 
   function onUVCommit() {
@@ -1356,38 +1406,81 @@ const [selFace,  setSelFace]  = useState(null)
     save,
     saveAs,
     // ── UV editing from Studio texture grid ──────────────────────────────────
+    // Returns { origData, items: [{modelPath,boxIdx,mode,startVal,face?}] }
+    // items = all selected offset-mode boxes (multi or single)
+    // For a single box with face UVs, also returns rects+face for Studio hit test
     getBoxUVInfo: () => {
-      const cur = selRef.current
-      if (!cur || cur.kind !== 'box' || !dataRef.current) return null
-      const node = getNode(dataRef.current.models, cur.modelPath)
-      const box = node?.boxes?.[cur.boxIdx]
-      if (!box) return null
+      if (!dataRef.current) return null
+      const allSel = multiSelRef.current.length ? multiSelRef.current : (selRef.current ? [selRef.current] : [])
+      const seen = new Set()
+      const allBoxes = []
+      for (const s of allSel) {
+        for (const it of collectSelBoxes(s)) {
+          const k = `${it.modelPath.join('_')}_${it.boxIdx}`
+          if (!seen.has(k)) { seen.add(k); allBoxes.push(it) }
+        }
+      }
+      if (!allBoxes.length) return null
+      const origData = JSON.stringify(dataRef.current)
+      if (allBoxes.length === 1) {
+        const { box, modelPath, boxIdx } = allBoxes[0]
+        const rects = getFaceRects(box)
+        // For face-mode boxes, item.face is filled in by Studio after hit test
+        return {
+          origData, modelPath, boxIdx,
+          singleFaceMode: !box.textureOffset,
+          rects,
+          items: box.textureOffset
+            ? [{ modelPath, boxIdx, mode: 'offset', startVal: [...box.textureOffset] }]
+            : [{ modelPath, boxIdx, mode: 'face', startFaceRects: rects }], // face filled in by caller
+        }
+      }
+      // Multi: move all boxes (offset and per-face)
+      if (!allBoxes.length) return null
       return {
-        mode: box.textureOffset ? 'offset' : 'face',
-        textureOffset: box.textureOffset ? [...box.textureOffset] : null,
-        rects: getFaceRects(box),
-        origData: JSON.stringify(dataRef.current),
+        origData,
+        singleFaceMode: false,
+        rects: null,
+        items: allBoxes.map(it => {
+          if (it.box.textureOffset)
+            return { modelPath: it.modelPath, boxIdx: it.boxIdx, mode: 'offset', startVal: [...it.box.textureOffset] }
+          const faceCoords = {}
+          for (const f of FACES) {
+            const k = 'uv'+f[0].toUpperCase()+f.slice(1)
+            if (it.box[k]) faceCoords[f] = [...it.box[k]]
+          }
+          return { modelPath: it.modelPath, boxIdx: it.boxIdx, mode: 'allfaces', faceCoords }
+        }),
       }
     },
-    applyUVMove: (du, dv, mode, face, startOffset, startFaceCoords) => {
-      const cur = selRef.current
-      if (!cur || cur.kind !== 'box' || !dataRef.current) return
-      const { modelPath, boxIdx } = cur
+    // items = array from getBoxUVInfo; du/dv = pixel delta
+    // For face-mode items, item.face and item.startVal must be set before calling
+    applyUVMove: (du, dv, items) => {
+      if (!dataRef.current || !items?.length) return
       const rdu = Math.round(du), rdv = Math.round(dv)
-      let updater
-      if (mode === 'offset') {
-        updater = b => ({...b, textureOffset: [startOffset[0]+rdu, startOffset[1]+rdv]})
-      } else if (face) {
-        const key = 'uv'+face[0].toUpperCase()+face.slice(1)
-        const [x1,y1,x2,y2] = startFaceCoords
-        updater = b => ({...b, [key]: [x1+rdu, y1+rdv, x2+rdu, y2+rdv]})
-      } else return
-      dataRef.current = {
-        ...dataRef.current,
-        models: updateNode(dataRef.current.models, modelPath, n => {
-          const boxes = [...(n.boxes||[])]; boxes[boxIdx] = updater(boxes[boxIdx]); return {...n, boxes}
+      let models = dataRef.current.models
+      for (const it of items) {
+        models = updateNode(models, it.modelPath, n => {
+          const boxes = [...(n.boxes||[])]
+          if (it.mode === 'offset') {
+            boxes[it.boxIdx] = { ...boxes[it.boxIdx], textureOffset: [it.startVal[0]+rdu, it.startVal[1]+rdv] }
+          } else if (it.mode === 'face' && it.face && it.startVal) {
+            const key = 'uv'+it.face[0].toUpperCase()+it.face.slice(1)
+            const [x1,y1,x2,y2] = it.startVal
+            boxes[it.boxIdx] = { ...boxes[it.boxIdx], [key]: [x1+rdu, y1+rdv, x2+rdu, y2+rdv] }
+          } else if (it.mode === 'allfaces') {
+            const updated = { ...boxes[it.boxIdx] }
+            for (const [f, coords] of Object.entries(it.faceCoords)) {
+              const key = 'uv'+f[0].toUpperCase()+f.slice(1)
+              const [x1,y1,x2,y2] = coords
+              updated[key] = [x1+rdu, y1+rdv, x2+rdu, y2+rdv]
+            }
+            boxes[it.boxIdx] = updated
+          }
+          return { ...n, boxes }
         })
       }
+      dataRef.current = { ...dataRef.current, models }
       redrawUVRef.current?.()
     },
     commitUV: origData => {

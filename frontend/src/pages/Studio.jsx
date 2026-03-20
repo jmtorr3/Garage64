@@ -614,16 +614,19 @@ export default function Studio() {
     setEditTab(tab)
   }
 
+  // Returns { face, isMulti } if px,py hits any visible UV rect, null otherwise
   function hitTestUV(px, py) {
     const uvo = uvOverlayRef.current
-    if (!uvo || uvo.rectSets.length !== 1) return null   // only single-box selection
-    const rects = uvo.rectSets[0]
-    for (const [face, r] of Object.entries(rects)) {
-      if (!r) continue
-      const [x1,y1,x2,y2] = r
-      const sx = Math.min(x1,x2), sy = Math.min(y1,y2)
-      const sw = Math.abs(x2-x1), sh = Math.abs(y2-y1)
-      if (px >= sx && px < sx+sw && py >= sy && py < sy+sh) return face
+    if (!uvo || !uvo.rectSets.length) return null
+    for (const rects of uvo.rectSets) {
+      for (const [face, r] of Object.entries(rects)) {
+        if (!r) continue
+        const [x1,y1,x2,y2] = r
+        const sx = Math.min(x1,x2), sy = Math.min(y1,y2)
+        const sw = Math.abs(x2-x1), sh = Math.abs(y2-y1)
+        if (px >= sx && px < sx+sw && py >= sy && py < sy+sh)
+          return { face, isMulti: uvo.rectSets.length > 1 }
+      }
     }
     return null
   }
@@ -632,17 +635,18 @@ export default function Studio() {
     // In Block Editor tab: UV drag takes priority over painting
     if (editTabRef.current === 'modeler' && modelerRef.current) {
       const [px, py] = toPixel(e)
-      const face = hitTestUV(px, py)
-      if (face !== null) {
+      const hit = hitTestUV(px, py)
+      if (hit !== null) {
         const info = modelerRef.current.getBoxUVInfo()
         if (info) {
-          uvTexDragRef.current = {
-            startPx: px, startPy: py, face,
-            mode: info.mode,
-            startOffset: info.textureOffset,
-            startFaceCoords: info.rects[face],
-            origData: info.origData,
+          // For single face-mode box, stamp face+startVal onto the item before storing
+          let items = info.items
+          if (!hit.isMulti && info.singleFaceMode && items.length === 1) {
+            const it = items[0]
+            const faceCoords = it.startFaceRects?.[hit.face]
+            items = [{ ...it, face: hit.face, startVal: faceCoords ? [...faceCoords] : [0,0,0,0] }]
           }
+          uvTexDragRef.current = { startPx: px, startPy: py, items, origData: info.origData }
           setTexCursor('grabbing')
           return
         }
@@ -665,7 +669,7 @@ export default function Studio() {
     // Active UV drag
     if (uvTexDragRef.current) {
       const d = uvTexDragRef.current
-      modelerRef.current?.applyUVMove(px - d.startPx, py - d.startPy, d.mode, d.face, d.startOffset, d.startFaceCoords)
+      modelerRef.current?.applyUVMove(px - d.startPx, py - d.startPy, d.items)
       return
     }
     // UV hover cursor in modeler tab
