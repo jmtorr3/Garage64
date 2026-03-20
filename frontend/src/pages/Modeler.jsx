@@ -91,6 +91,22 @@ function selKey(sel) {
   return sel.kind==='model' ? `m_${sel.modelPath.join('_')}` : `b_${sel.modelPath.join('_')}_${sel.boxIdx}`
 }
 
+// Returns flat ordered list of visible outliner items given the open-nodes set
+function getFlatVisible(models, openNodes, prefix=[]) {
+  const result = []
+  for (let i = 0; i < (models||[]).length; i++) {
+    const model = models[i]
+    const modelPath = [...prefix, i]
+    result.push({ kind:'model', modelPath })
+    if (openNodes.has(modelPath.join('_'))) {
+      for (let bi = 0; bi < (model.boxes||[]).length; bi++)
+        result.push({ kind:'box', modelPath, boxIdx:bi })
+      result.push(...getFlatVisible(model.submodels, openNodes, modelPath))
+    }
+  }
+  return result
+}
+
 function findThreeObj(root, sel) {
   if (!root||!sel) return null
   let found=null
@@ -194,8 +210,8 @@ function adjustPath(srcPath, tgtPath) {
 
 // ── Outliner ──────────────────────────────────────────────────────────────────
 
-function OutlinerNode({model, modelPath, sel, onSel, onDragStart, onDrop, depth=0, hiddenModels, onToggleVisible, onRename, onDelete}) {
-  const [open,setOpen]=useState(false)
+function OutlinerNode({model, modelPath, sel, multiSel, onSel, onDragStart, onDrop, depth=0, hiddenModels, onToggleVisible, onRename, onDelete, openNodes, onToggleOpen, onOpenNode}) {
+  const open = openNodes?.has(modelPath.join('_')) ?? false
   const [editing,setEditing]=useState(false)
   const [editVal,setEditVal]=useState('')
   const [ctxMenu,setCtxMenu]=useState(null)
@@ -210,20 +226,24 @@ function OutlinerNode({model, modelPath, sel, onSel, onDragStart, onDrop, depth=
   },[ctxMenu])
   const hoverTimer = useRef(null)
   const indent=depth*14
-  const isSel=sel?.kind==='model'&&selKey(sel)===selKey({kind:'model',modelPath})
+  const thisKey=selKey({kind:'model',modelPath})
+  const isSel=(multiSel||[]).some(s=>s.kind==='model'&&selKey(s)===thisKey)
 
-  // Auto-open when selection is inside this node
+  // Auto-open when any selection is inside this node
   useEffect(()=>{
-    if (!sel?.modelPath) return
-    const sp=sel.modelPath
-    const isAnc = sp.length > modelPath.length && modelPath.every((v,i)=>sp[i]===v)
-    const isParent = sel.kind==='box' && sp.length===modelPath.length && modelPath.every((v,i)=>sp[i]===v)
-    if (isAnc || isParent) setOpen(true)
-  },[sel]) // eslint-disable-line react-hooks/exhaustive-deps
+    const all = multiSel?.length ? multiSel : (sel ? [sel] : [])
+    for (const s of all) {
+      if (!s?.modelPath) continue
+      const sp=s.modelPath
+      const isAnc = sp.length > modelPath.length && modelPath.every((v,i)=>sp[i]===v)
+      const isParent = s.kind==='box' && sp.length===modelPath.length && modelPath.every((v,i)=>sp[i]===v)
+      if (isAnc || isParent) { onOpenNode?.(modelPath); break }
+    }
+  },[sel, multiSel]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function onDragOverNode(e) {
     e.preventDefault(); e.stopPropagation(); setDropOver(true)
-    if (!hoverTimer.current) hoverTimer.current = setTimeout(() => setOpen(true), 600)
+    if (!hoverTimer.current) hoverTimer.current = setTimeout(() => onOpenNode?.(modelPath), 600)
   }
   function onDragLeaveNode() {
     setDropOver(false)
@@ -243,10 +263,10 @@ function OutlinerNode({model, modelPath, sel, onSel, onDragStart, onDrop, depth=
           background:isSel?'var(--clr-accent)':dropOver?'rgba(100,160,255,0.18)':'transparent',
           color:isSel?'#fff':'var(--clr-text)',
           outline:dropOver?'1px dashed #4488ff':'none', cursor:'grab'}}
-        onClick={()=>onSel({kind:'model',modelPath})}
-        onContextMenu={e=>{e.preventDefault();e.stopPropagation();onSel({kind:'model',modelPath});setCtxMenu({x:e.clientX,y:e.clientY})}}>
+        onClick={e=>onSel({kind:'model',modelPath},e.shiftKey,e.ctrlKey||e.metaKey)}
+        onContextMenu={e=>{e.preventDefault();e.stopPropagation();onSel({kind:'model',modelPath},false,false);setCtxMenu({x:e.clientX,y:e.clientY})}}>
         <span style={{fontSize:'9px',width:'10px',color:isSel?'#fff':'var(--clr-text-dim)',flexShrink:0}}
-          onClick={e=>{e.stopPropagation();setOpen(v=>!v)}}>
+          onClick={e=>{e.stopPropagation();onToggleOpen?.(modelPath)}}>
           {hasChildren?(open?'▼':'▶'):' '}
         </span>
         <span style={{color:isSel?'#fff':'#88aaff'}}>{(model.submodels?.length && !model.boxes?.length) ? '📁' : '⬡'}</span>
@@ -270,16 +290,17 @@ function OutlinerNode({model, modelPath, sel, onSel, onDragStart, onDrop, depth=
       {open&&<>
         {(model.boxes||[]).map((box,bi)=>{
           const boxSel={kind:'box',modelPath,boxIdx:bi}
-          const bSel=sel?.kind==='box'&&selKey(sel)===selKey(boxSel)
+          const bSel=(multiSel||[]).some(s=>s.kind==='box'&&selKey(s)===selKey(boxSel))
           return (
             <BoxRow key={bi} box={box} bi={bi} indent={indent} bSel={bSel} modelPath={modelPath}
               onSel={onSel} onDragStart={onDragStart} onDrop={onDrop} boxSel={boxSel}/>
           )
         })}
         {(model.submodels||[]).map((sub,si)=>(
-          <OutlinerNode key={si} model={sub} modelPath={[...modelPath,si]} sel={sel} onSel={onSel}
+          <OutlinerNode key={si} model={sub} modelPath={[...modelPath,si]} sel={sel} multiSel={multiSel} onSel={onSel}
             onDragStart={onDragStart} onDrop={onDrop} depth={depth+1}
-            hiddenModels={hiddenModels} onToggleVisible={onToggleVisible} onRename={onRename} onDelete={onDelete}/>
+            hiddenModels={hiddenModels} onToggleVisible={onToggleVisible} onRename={onRename} onDelete={onDelete}
+            openNodes={openNodes} onToggleOpen={onToggleOpen} onOpenNode={onOpenNode}/>
         ))}
       </>}
       {ctxMenu&&<div
@@ -334,7 +355,7 @@ function BoxRow({box, bi, indent, bSel, modelPath, onSel, onDragStart, onDrop, b
         background:bSel?'var(--clr-accent)':dropOver?'rgba(100,160,255,0.18)':'transparent',
         color:bSel?'#fff':'var(--clr-text)',
         outline:dropOver?'1px dashed #4488ff':'none', cursor:'grab'}}
-      onClick={()=>onSel(boxSel)}>
+      onClick={e=>onSel(boxSel,e.shiftKey,e.ctrlKey||e.metaKey)}>
       <span style={{color:bSel?'#fff':'#ffaa55'}}>□</span>
       <span>cube {bi}</span>
       {box.coordinates&&<span style={{color:'rgba(160,160,160,0.5)',fontSize:'10px',marginLeft:4}}>
@@ -366,7 +387,7 @@ function Vec3Input({label, value=[0,0,0], step=0.5, onChange}) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBodyId, onBack, embedded = false, sharedViewerRef = null, texturePatch = null, showBodyPreview = null, previewParts = null, onBarUpdate = null, showGridProp = null, newPart = false, uvZoom = null, onUvChange = null } = {}, ref) {
+const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBodyId, onBack, embedded = false, sharedViewerRef = null, texturePatch = null, onBarUpdate = null, showGridProp = null, newPart = false, uvZoom = null, onUvChange = null } = {}, ref) {
   const [searchParams] = useSearchParams()
   const { isDark } = useTheme()
   const bg = isDark ? '#1e1e1e' : '#ece9d8'
@@ -377,12 +398,15 @@ const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBo
   const [partId,  setPartId]  = useState(null)
   const partObjRef = useRef(null) // full part object for save
   const [sel,     setSel]     = useState(null)
+  const [multiSel, setMultiSel] = useState([]) // all selected items (including primary)
   const [tcMode,  setTcMode]  = useState('translate')
   const [dirty,    setDirty]   = useState(false)
   const [status,   setStatus]  = useState('')
   const [dataVer,  setDataVer] = useState(0) // bumped to force re-render from ref
   const [showGrid, setShowGrid] = useState(false)
   const [hiddenModels, setHiddenModels] = useState(new Set())
+  const [openNodes,    setOpenNodes]    = useState(new Set()) // set of modelPath keys that are expanded
+  const anchorSelRef = useRef(null) // last non-shift click — range selection anchor
   const [saveAsName,   setSaveAsName]   = useState('')
   const [rPanelWidth,  setRPanelWidth]  = useState(270)
   const hiddenModelsRef = useRef(new Set())
@@ -393,13 +417,15 @@ const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBo
   // Model data lives in a ref so TC sync doesn't trigger rebuilds
   const dataRef    = useRef(null)
   const origRef    = useRef(null)
-  const selRef     = useRef(null)
+  const selRef       = useRef(null)
+  const multiSelRef  = useRef([])
   const tcModeRef  = useRef('translate')
   const undoStackRef   = useRef([])
   const redoStackRef   = useRef([])
   const modelerUndoRef = useRef(null)
   const modelerRedoRef = useRef(null)
   useEffect(()=>{ selRef.current=sel },[sel])
+  useEffect(()=>{ multiSelRef.current=multiSel },[multiSel])
   useEffect(()=>{ tcModeRef.current=tcMode },[tcMode])
   useEffect(()=>{ if (ctxRef.current) ctxRef.current.scene.background=new THREE.Color(bg) },[bg])
   useEffect(()=>{ if (ctxRef.current?.grid) ctxRef.current.grid.visible=showGrid },[showGrid])
@@ -425,6 +451,7 @@ const [selFace,  setSelFace]  = useState(null)
   const selFaceRef   = useRef(null)
   const bodyGroupRef = useRef(null)
   useEffect(()=>{ selFaceRef.current = selFace },[selFace])
+  const redrawUVRef = useRef(null)
 
   // ── Load on mount — prefer props, fall back to query params ────────────────
   useEffect(()=>{
@@ -845,8 +872,39 @@ const [selFace,  setSelFace]  = useState(null)
     clearSel()
   }
 
-  function selectAndAttach(newSel) {
-    setSel(newSel)
+  function toggleOpen(modelPath) {
+    const key = modelPath.join('_')
+    setOpenNodes(prev => { const n=new Set(prev); n.has(key)?n.delete(key):n.add(key); return n })
+  }
+  function openNode(modelPath) {
+    const key = modelPath.join('_')
+    setOpenNodes(prev => prev.has(key) ? prev : new Set([...prev, key]))
+  }
+
+  function selectAndAttach(newSel, shiftKey=false, ctrlKey=false) {
+    if (shiftKey) {
+      // Range: select everything from anchor to newSel in visible order
+      const flat = getFlatVisible(dataRef.current?.models, openNodes)
+      const anchor = anchorSelRef.current ?? newSel
+      const ai = flat.findIndex(s => selKey(s) === selKey(anchor))
+      const ti = flat.findIndex(s => selKey(s) === selKey(newSel))
+      const range = (ai === -1 || ti === -1)
+        ? [newSel]
+        : flat.slice(Math.min(ai,ti), Math.max(ai,ti)+1)
+      setMultiSel(range)
+      setSel(newSel)
+      // anchor stays unchanged for continued shift-clicks
+    } else if (ctrlKey) {
+      // Toggle individual item
+      const key = selKey(newSel)
+      setMultiSel(prev => prev.some(s => selKey(s)===key) ? prev.filter(s=>selKey(s)!==key) : [...prev, newSel])
+      setSel(newSel)
+      anchorSelRef.current = newSel
+    } else {
+      setMultiSel([newSel])
+      setSel(newSel)
+      anchorSelRef.current = newSel
+    }
     const ctx=ctxRef.current; if (!ctx?.modelGroup) return
     const obj=findThreeObj(ctx.modelGroup,newSel)
     if (obj) {
@@ -859,6 +917,7 @@ const [selFace,  setSelFace]  = useState(null)
 
   function clearSel() {
     setSel(null)
+    setMultiSel([])
     onUvChange?.(null)
     const ctx=ctxRef.current; if (!ctx) return
     ctx.tc.detach(); clearHelper()
@@ -889,14 +948,22 @@ const [selFace,  setSelFace]  = useState(null)
     }
     // UV overlay for selected element(s)
     const cur = selRef.current
+    const allSel = multiSelRef.current.length ? multiSelRef.current : (cur ? [cur] : [])
     let boxList = []
     let singleBox = false
-    if (cur?.kind === 'box') {
-      const b = getNode(dataRef.current?.models, cur.modelPath)?.boxes?.[cur.boxIdx]
+    if (allSel.length === 1 && allSel[0].kind === 'box') {
+      const b = getNode(dataRef.current?.models, allSel[0].modelPath)?.boxes?.[allSel[0].boxIdx]
       if (b) { boxList = [b]; singleBox = true }
-    } else if (cur?.kind === 'model') {
-      const node = getNode(dataRef.current?.models, cur.modelPath)
-      if (node) boxList = collectBoxes(node)
+    } else {
+      for (const s of allSel) {
+        if (s.kind === 'box') {
+          const b = getNode(dataRef.current?.models, s.modelPath)?.boxes?.[s.boxIdx]
+          if (b) boxList.push(b)
+        } else if (s.kind === 'model') {
+          const node = getNode(dataRef.current?.models, s.modelPath)
+          if (node) boxList.push(...collectBoxes(node))
+        }
+      }
     }
 
     const rectSets = []
@@ -928,6 +995,8 @@ const [selFace,  setSelFace]  = useState(null)
     }
   }, [uvZoom, onUvChange]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  redrawUVRef.current = redrawUV
+
   // ── UV canvas interaction ─────────────────────────────────────────────────
 
   function getUVHit(px, py, box) {
@@ -953,7 +1022,7 @@ const [selFace,  setSelFace]  = useState(null)
         return {...n, boxes}
       })
     }
-    redrawUV()
+    redrawUVRef.current?.()
   }
 
   function onUVMouseDown(e) {
@@ -1023,6 +1092,75 @@ const [selFace,  setSelFace]  = useState(null)
     undoStackRef.current.push(drag.origData)
     if (undoStackRef.current.length > 100) undoStackRef.current.shift()
     redoStackRef.current = []
+    setDataVer(v => v+1)
+    setDirty(true)
+    notifyBar()
+  }
+
+  // ── UV auto-pack ─────────────────────────────────────────────────────────
+
+  function autoPackUVs() {
+    const cur = selRef.current
+    if (!cur || !dataRef.current) return
+    const texW = uvBufRef.current?.width ?? dataRef.current.textureSize?.[0] ?? 64
+
+    // Collect all {modelPath, boxIdx, box} for the selected node
+    function collectBoxPaths(model, fullPath) {
+      const out = []
+      ;(model.boxes || []).forEach((box, i) => out.push({ modelPath: fullPath, boxIdx: i, box }))
+      ;(model.submodels || []).forEach((sub, i) => out.push(...collectBoxPaths(sub, [...fullPath, i])))
+      return out
+    }
+
+    let items = []
+    if (cur.kind === 'box') {
+      const node = getNode(dataRef.current.models, cur.modelPath)
+      const box = node?.boxes?.[cur.boxIdx]
+      if (box) items = [{ modelPath: cur.modelPath, boxIdx: cur.boxIdx, box }]
+    } else if (cur.kind === 'model') {
+      const node = getNode(dataRef.current.models, cur.modelPath)
+      if (node) items = collectBoxPaths(node, cur.modelPath)
+    }
+    if (!items.length) return
+
+    // Only pack boxes that use textureOffset — skip per-face UV boxes
+    // (adding textureOffset to a per-face box overrides its UVs and corrupts the model)
+    const PER_FACE = ['uvNorth','uvSouth','uvEast','uvWest','uvUp','uvDown']
+    const packable = items.filter(({ box }) => !PER_FACE.some(k => k in box))
+    if (!packable.length) return
+
+    // Compute cross-pattern pixel size for each box
+    const sized = packable.map(item => {
+      const [,,, w=1, h=1, d=1] = item.box.coordinates || []
+      return { ...item, pw: 2*(d+w), ph: d+h }
+    }).sort((a, b) => b.ph - a.ph || b.pw - a.pw) // tallest first
+
+    // Shelf packing — greedy left-to-right, new row when full
+    const shelves = [] // { y, h, usedW }
+    const placements = []
+    for (const item of sized) {
+      const { pw, ph } = item
+      let shelf = shelves.find(s => texW - s.usedW >= pw)
+      if (!shelf) {
+        const y = shelves.reduce((acc, s) => acc + s.h, 0)
+        shelf = { y, h: ph, usedW: 0 }
+        shelves.push(shelf)
+      }
+      placements.push({ item, u: shelf.usedW, v: shelf.y })
+      shelf.usedW += pw
+    }
+
+    // Apply
+    pushUndo()
+    let newModels = dataRef.current.models
+    for (const { item, u, v } of placements) {
+      newModels = updateNode(newModels, item.modelPath, n => {
+        const boxes = [...(n.boxes || [])]
+        boxes[item.boxIdx] = { ...boxes[item.boxIdx], textureOffset: [u, v] }
+        return { ...n, boxes }
+      })
+    }
+    dataRef.current = { ...dataRef.current, models: newModels }
     setDataVer(v => v+1)
     setDirty(true)
     notifyBar()
@@ -1150,15 +1288,26 @@ const [selFace,  setSelFace]  = useState(null)
   }
 
   function deleteSelected() {
-    if (!sel||!dataRef.current) return
-    if (sel.kind==='box') {
-      bump(updateNode(dataRef.current.models,sel.modelPath,n=>{
-        const boxes=[...(n.boxes||[])]; boxes.splice(sel.boxIdx,1); return {...n,boxes}
-      }))
-      clearSel()
-    } else if (sel.kind==='model') {
-      deleteModel(sel.modelPath)
+    if (!dataRef.current) return
+    const targets = multiSelRef.current.length ? multiSelRef.current : (sel ? [sel] : [])
+    if (!targets.length) return
+    // Delete boxes first (sort by descending boxIdx to avoid index shift), then models
+    const boxes = targets.filter(s => s.kind === 'box')
+      .sort((a,b) => b.boxIdx - a.boxIdx)
+    // Sort model paths descending by last index to avoid index shifts during removal
+    const models = targets.filter(s => s.kind === 'model')
+      .sort((a,b) => b.modelPath[b.modelPath.length-1] - a.modelPath[a.modelPath.length-1])
+    let newModels = dataRef.current.models
+    for (const s of boxes) {
+      newModels = updateNode(newModels, s.modelPath, n => {
+        const bxs = [...(n.boxes||[])]; bxs.splice(s.boxIdx, 1); return {...n, boxes:bxs}
+      })
     }
+    for (const s of models) {
+      ;[newModels] = extractModel(newModels, s.modelPath)
+    }
+    bump(newModels)
+    clearSel()
   }
 
   function handleRename(modelPath, newName) {
@@ -1206,6 +1355,48 @@ const [selFace,  setSelFace]  = useState(null)
     redo: modelerRedo,
     save,
     saveAs,
+    // ── UV editing from Studio texture grid ──────────────────────────────────
+    getBoxUVInfo: () => {
+      const cur = selRef.current
+      if (!cur || cur.kind !== 'box' || !dataRef.current) return null
+      const node = getNode(dataRef.current.models, cur.modelPath)
+      const box = node?.boxes?.[cur.boxIdx]
+      if (!box) return null
+      return {
+        mode: box.textureOffset ? 'offset' : 'face',
+        textureOffset: box.textureOffset ? [...box.textureOffset] : null,
+        rects: getFaceRects(box),
+        origData: JSON.stringify(dataRef.current),
+      }
+    },
+    applyUVMove: (du, dv, mode, face, startOffset, startFaceCoords) => {
+      const cur = selRef.current
+      if (!cur || cur.kind !== 'box' || !dataRef.current) return
+      const { modelPath, boxIdx } = cur
+      const rdu = Math.round(du), rdv = Math.round(dv)
+      let updater
+      if (mode === 'offset') {
+        updater = b => ({...b, textureOffset: [startOffset[0]+rdu, startOffset[1]+rdv]})
+      } else if (face) {
+        const key = 'uv'+face[0].toUpperCase()+face.slice(1)
+        const [x1,y1,x2,y2] = startFaceCoords
+        updater = b => ({...b, [key]: [x1+rdu, y1+rdv, x2+rdu, y2+rdv]})
+      } else return
+      dataRef.current = {
+        ...dataRef.current,
+        models: updateNode(dataRef.current.models, modelPath, n => {
+          const boxes = [...(n.boxes||[])]; boxes[boxIdx] = updater(boxes[boxIdx]); return {...n, boxes}
+        })
+      }
+      redrawUVRef.current?.()
+    },
+    commitUV: origData => {
+      if (!origData) return
+      undoStackRef.current.push(origData)
+      if (undoStackRef.current.length > 100) undoStackRef.current.shift()
+      redoStackRef.current = []
+      setDataVer(v => v+1); setDirty(true); notifyBar()
+    },
   }), []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function startRPanelResize(e) {
@@ -1363,7 +1554,7 @@ const [selFace,  setSelFace]  = useState(null)
           <div style={{flex:1,overflowY:'auto',display:'flex',flexDirection:'column'}}>
             <div style={{flex:1}}>
               {(data?.models||[]).map((model,mi)=>(
-                <OutlinerNode key={mi} model={model} modelPath={[mi]} sel={sel} onSel={selectAndAttach} onDragStart={handleDragStart} onDrop={handleDrop} depth={0} hiddenModels={hiddenModels} onToggleVisible={toggleModelVisible} onRename={handleRename} onDelete={deleteModel}/>
+                <OutlinerNode key={mi} model={model} modelPath={[mi]} sel={sel} multiSel={multiSel} onSel={selectAndAttach} onDragStart={handleDragStart} onDrop={handleDrop} depth={0} hiddenModels={hiddenModels} onToggleVisible={toggleModelVisible} onRename={handleRename} onDelete={deleteModel} openNodes={openNodes} onToggleOpen={toggleOpen} onOpenNode={openNode}/>
               ))}
             </div>
             {/* Root drop zone — drag here to move a model back to top level */}
@@ -1417,6 +1608,10 @@ const [selFace,  setSelFace]  = useState(null)
                   onChange={v=>patchModel(n=>({...n,translate:v}))}/>
                 <Vec3Input label="Rotate (°)" value={selModel.rotate||[0,0,0]}
                   onChange={v=>patchModel(n=>({...n,rotate:v}))}/>
+                <button style={{...s.btnSm, marginTop:4}} onClick={autoPackUVs}
+                  title="Re-pack all UV offsets in this folder with no overlap">
+                  ⬡ Auto-Pack UVs
+                </button>
               </>
             )}
 
@@ -1429,6 +1624,10 @@ const [selFace,  setSelFace]  = useState(null)
                   onChange={v=>patchBox(b=>({...b,coordinates:[...v,...(b.coordinates?.slice(3)||[1,1,1])]}))}/>
                 <Vec3Input label="Size" value={selBox.coordinates?.slice(3,6)||[1,1,1]} step={1}
                   onChange={v=>patchBox(b=>({...b,coordinates:[...(b.coordinates?.slice(0,3)||[0,0,0]),...v]}))}/>
+                <button style={{...s.btnSm, marginBottom:8}} onClick={autoPackUVs}
+                  title="Re-pack UV offsets for all cubes in the parent folder">
+                  ⬡ Auto-Pack UVs
+                </button>
 
                 {/* Face selector */}
                 <div style={{marginBottom:8}}>

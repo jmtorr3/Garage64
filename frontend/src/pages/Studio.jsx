@@ -234,7 +234,9 @@ export default function Studio() {
   const [viewerVer,    setViewerVer]    = useState(0)
   const canvasRef     = useRef(null)
   const bufRef        = useRef(null)
-  const uvOverlayRef  = useRef(null)   // { rects, selFace } from Modeler
+  const uvOverlayRef  = useRef(null)   // { rectSets, selFace } from Modeler
+  const uvTexDragRef  = useRef(null)   // active UV drag on the texture grid
+  const [texCursor, setTexCursor] = useState(null) // override cursor on texture canvas
   const drawingRef = useRef(false)
   const undoRef    = useRef([])
   const redoRef    = useRef([])
@@ -612,7 +614,41 @@ export default function Studio() {
     setEditTab(tab)
   }
 
+  function hitTestUV(px, py) {
+    const uvo = uvOverlayRef.current
+    if (!uvo || uvo.rectSets.length !== 1) return null   // only single-box selection
+    const rects = uvo.rectSets[0]
+    for (const [face, r] of Object.entries(rects)) {
+      if (!r) continue
+      const [x1,y1,x2,y2] = r
+      const sx = Math.min(x1,x2), sy = Math.min(y1,y2)
+      const sw = Math.abs(x2-x1), sh = Math.abs(y2-y1)
+      if (px >= sx && px < sx+sw && py >= sy && py < sy+sh) return face
+    }
+    return null
+  }
+
   function onTexDown(e) {
+    // In Block Editor tab: UV drag takes priority over painting
+    if (editTabRef.current === 'modeler' && modelerRef.current) {
+      const [px, py] = toPixel(e)
+      const face = hitTestUV(px, py)
+      if (face !== null) {
+        const info = modelerRef.current.getBoxUVInfo()
+        if (info) {
+          uvTexDragRef.current = {
+            startPx: px, startPy: py, face,
+            mode: info.mode,
+            startOffset: info.textureOffset,
+            startFaceCoords: info.rects[face],
+            origData: info.origData,
+          }
+          setTexCursor('grabbing')
+          return
+        }
+      }
+      return  // don't paint while in modeler tab
+    }
     drawingRef.current = true
     if (tool === 'drag') {
       const c = scrollContainerRef.current
@@ -626,6 +662,17 @@ export default function Studio() {
   function onTexMove(e) {
     const [px, py] = toPixel(e)
     setHoverPixel([px, py])
+    // Active UV drag
+    if (uvTexDragRef.current) {
+      const d = uvTexDragRef.current
+      modelerRef.current?.applyUVMove(px - d.startPx, py - d.startPy, d.mode, d.face, d.startOffset, d.startFaceCoords)
+      return
+    }
+    // UV hover cursor in modeler tab
+    if (editTabRef.current === 'modeler') {
+      setTexCursor(hitTestUV(px, py) !== null ? 'grab' : 'default')
+      return
+    }
     if (!drawingRef.current) return
     if (tool === 'drag') {
       const c = scrollContainerRef.current
@@ -635,8 +682,14 @@ export default function Studio() {
     }
     if (tool === 'pencil' || tool === 'eraser') paintPixel(px, py)
   }
-  function onTexUp()    { drawingRef.current = false; dragStartRef.current = null; viewerStrokeRef.current = false }
-  function onTexLeave() { drawingRef.current = false; dragStartRef.current = null; setHoverPixel(null); viewerStrokeRef.current = false }
+  function commitUVTexDrag() {
+    if (!uvTexDragRef.current) return
+    modelerRef.current?.commitUV(uvTexDragRef.current.origData)
+    uvTexDragRef.current = null
+    setTexCursor(null)
+  }
+  function onTexUp()    { commitUVTexDrag(); drawingRef.current = false; dragStartRef.current = null; viewerStrokeRef.current = false }
+  function onTexLeave() { commitUVTexDrag(); drawingRef.current = false; dragStartRef.current = null; setHoverPixel(null); viewerStrokeRef.current = false; setTexCursor(null) }
 
   // Called by the center 3D viewer when user paints on the model surface
   function onPaintUV(u, v, isFirst) {
@@ -935,7 +988,7 @@ export default function Studio() {
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           <div ref={scrollContainerRef} style={{ position: 'absolute', inset: 0, overflow: 'auto', padding: '12px', display: 'flex', alignItems: 'flex-start' }}>
             {texPath
-              ? <canvas ref={canvasRef} style={{ display: 'block', imageRendering: 'pixelated', cursor: tool === 'drag' ? 'grab' : 'crosshair' }}
+              ? <canvas ref={canvasRef} style={{ display: 'block', imageRendering: 'pixelated', cursor: texCursor ?? (tool === 'drag' ? 'grab' : 'crosshair') }}
                   onMouseDown={onTexDown} onMouseMove={onTexMove} onMouseUp={onTexUp} onMouseLeave={onTexLeave} onWheel={onTexWheel} />
               : <div style={{ color: 'var(--clr-text-dim)', fontFamily: 'Monocraft, sans-serif' }}>No texture loaded.</div>
             }
@@ -1370,7 +1423,7 @@ export default function Studio() {
               {/* Canvas */}
               <div ref={scrollContainerRef} style={{ overflow:'auto', maxHeight:'340px', background:'#111', border:'1px solid var(--bdr-dk)', margin:'0 4px' }}>
                 {texPath
-                  ? <canvas ref={canvasRef} style={{ display:'block', imageRendering:'pixelated', cursor: tool==='drag'?'grab':'crosshair' }}
+                  ? <canvas ref={canvasRef} style={{ display:'block', imageRendering:'pixelated', cursor: texCursor ?? (tool==='drag'?'grab':'crosshair') }}
                       onMouseDown={onTexDown} onMouseMove={onTexMove} onMouseUp={onTexUp} onMouseLeave={onTexLeave} />
                   : <div style={{ padding:'8px', color:'var(--clr-text-dim)', fontSize:'11px', fontFamily:'Monocraft, sans-serif' }}>No texture loaded.</div>
                 }
