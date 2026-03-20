@@ -220,17 +220,15 @@ export default function Studio() {
   const [bodyData,    setBodyData]    = useState(null)
 
   // ── Texture ───────────────────────────────────────────────────────────────────
-  const [variants,     setVariants]     = useState([])
-  const [texVariantId, setTexVariantId] = useState('')
   const [texPath,      setTexPath]      = useState('')
   const [showSaveAs,   setShowSaveAs]   = useState(false)
   const [saveAsPath,   setSaveAsPath]   = useState('')
   const [zoom,         setZoom]         = useState(2)
   const [tool,         setTool]         = useState('drag')
-  const [color,        setColor]        = useState('#ff4455')
+  const [color,        setColor]        = useState(() => localStorage.getItem('g64-color') || '#ff4455')
   const [alpha,        setAlpha]        = useState(255)
-  const [hexInput,     setHexInput]     = useState('#ff4455')
-  const [colorHistory, setColorHistory] = useState([])
+  const [hexInput,     setHexInput]     = useState(() => localStorage.getItem('g64-color') || '#ff4455')
+  const [colorHistory, setColorHistory] = useState(() => { try { return JSON.parse(localStorage.getItem('g64-color-history') || '[]') } catch { return [] } })
   const [hoverPixel,   setHoverPixel]   = useState(null)
   const [texStatus,    setTexStatus]    = useState('')
   const [viewerVer,    setViewerVer]    = useState(0)
@@ -293,7 +291,7 @@ export default function Studio() {
             setExtraSel(new Set([preset.id]))
           }
           setComposeSelItem({ kind: 'part', partId: preset.id })
-          setEditTab('modeler')
+          setEditTab('texture')
           setPartSaveName(preset.name)
         }
       } else if (!searchParams.get('variantId') && !searchParams.get('new')) {
@@ -306,7 +304,6 @@ export default function Studio() {
       }
     })
     api.getSlots().then(setSlots)
-    api.getVariants().then(setVariants)
   }, [])
 
   // ── Compose computed ──────────────────────────────────────────────────────────
@@ -499,6 +496,8 @@ export default function Studio() {
   }, [zoom])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { redraw() }, [texEditorMode])
+  // Redraw when switching back to texture tab — canvas just mounted
+  useEffect(() => { if (editTab === 'texture') redraw() }, [editTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function toPixel(e) {
     const r = canvasRef.current.getBoundingClientRect()
@@ -529,7 +528,12 @@ export default function Studio() {
   }
 
   function pushHistory(hex) {
-    setColorHistory(h => [hex, ...h.filter(c => c !== hex)].slice(0,20))
+    localStorage.setItem('g64-color', hex)
+    setColorHistory(h => {
+      const next = [hex, ...h.filter(c => c !== hex)].slice(0, 20)
+      localStorage.setItem('g64-color-history', JSON.stringify(next))
+      return next
+    })
   }
 
   function saveTexUndoState() {
@@ -658,10 +662,6 @@ export default function Studio() {
     setZoom(newZoom)
   }
 
-  const bodyVariants = useMemo(() =>
-    variants.filter(v => currentBody && v.body_name === currentBody.name),
-    [variants, currentBody])
-
   function refreshViewers() {
     viewerRef.current?.triggerRebuild()
     setViewerVer(v => v + 1)
@@ -711,26 +711,10 @@ export default function Studio() {
     }, 'image/png')
   }
 
-  async function texSaveVariant() {
-    if (!bufRef.current) { setTexStatus('No texture loaded.'); return }
-    if (!texVariantId) { setTexStatus('Select a variant first.'); return }
-    const variant = variants.find(v => String(v.id) === texVariantId)
-    if (!variant || !currentBody) return
-    setTexStatus('')
-    bufRef.current.toBlob(async blob => {
-      try {
-        await api.saveVariantTexture(currentBody.name, variant.id, variant.file_name, blob)
-        setVariants(vs => vs.map(v => v.id === variant.id
-          ? { ...v, texture_override: `minecraft:optifine/cem/${currentBody.name}/variants/${variant.file_name}.png` }
-          : v))
-        setTexStatus('ok'); setTexDirty(false); refreshViewers()
-      } catch (e) { setTexStatus(e.message) }
-    }, 'image/png')
-  }
 
   function onHexChange(val) {
     setHexInput(val)
-    if (/^#[0-9a-fA-F]{6}$/.test(val)) setColor(val)
+    if (/^#[0-9a-fA-F]{6}$/.test(val)) { setColor(val); localStorage.setItem('g64-color', val) }
   }
 
   // ── Compose logic ─────────────────────────────────────────────────────────────
@@ -760,6 +744,10 @@ export default function Studio() {
     if (!partData) { setPartSaveStatus('No part data.'); return }
     const editingPart = composeSelItem?.kind === 'part' && !createPartMode
       ? parts.find(p => p.id === composeSelItem.partId) : null
+    if (!editingPart) {
+      const conflict = parts.find(p => p.name === partSaveName)
+      if (conflict) { setPartSaveStatus(`Part "${partSaveName}" already exists.`); return }
+    }
     const saveBody = createPartMode ? bodies.find(b => b.id === newPartBodyId) || currentBody : currentBody
     const bodyName = saveBody?.name || 'unknown'
     const jpmPath  = editingPart ? editingPart.jpm_path : `minecraft:optifine/cem/${bodyName}/parts/${partSaveName}.jpm`
@@ -794,6 +782,29 @@ export default function Studio() {
       }
       setSaveStatus('ok')
     } catch (e) { setSaveStatus(e.message) }
+  }
+
+  async function saveAll() {
+    setSaveStatus('')
+    const errors = []
+    // Save texture if loaded and dirty
+    if (bufRef.current && texPath && texDirty) {
+      await new Promise(resolve => bufRef.current.toBlob(async blob => {
+        try { await api.saveTexture(texPath, blob); setTexDirty(false); refreshViewers() }
+        catch (e) { errors.push(`Texture: ${e.message}`) }
+        resolve()
+      }, 'image/png'))
+    }
+    // Save variant metadata
+    if (saveForm.file_name) {
+      const payload = { file_name: saveForm.file_name, trigger_name: saveForm.trigger_name, body: bodyId, order: saveForm.order, part_ids: activeParts.map(p=>p.id) }
+      try {
+        if (currentVariantId) await api.updateVariant(currentVariantId, payload)
+        else await api.createVariant(payload)
+      } catch (e) { errors.push(`Variant: ${e.message}`) }
+    }
+    if (errors.length) setSaveStatus(errors.join(' | '))
+    else setSaveStatus('ok')
   }
   async function addSlot() {
     setSlotStatus('')
@@ -925,26 +936,11 @@ export default function Studio() {
         </div>
       </div>
 
-      {/* Right panel — variant + save only */}
-      <div style={{ width: 200, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-panel)', borderLeft: '2px solid var(--bdr-dk)' }}>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '4px' }}>
-          <div style={s.section}>
-            <div style={s.secHead}>Variant Override</div>
-            <div style={s.secBody}>
-              <select style={s.select} value={texVariantId} onChange={e => setTexVariantId(e.target.value)}>
-                <option value="">— none —</option>
-                {bodyVariants.map(v => (
-                  <option key={v.id} value={v.id}>{v.file_name}{v.texture_override ? ' ✓' : ''}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-        <div style={{ padding: '8px', borderTop: '2px solid var(--bdr-dk)', display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
+      {/* Right panel — save only */}
+      <div style={{ width: 160, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-panel)', borderLeft: '2px solid var(--bdr-dk)' }}>
+        <div style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <button style={s.btn} onClick={texSave}>Save PNG</button>
           <button style={s.btn} onClick={texSaveAs}>Save As</button>
-          <button style={{ ...s.btn, ...(texVariantId ? {} : { background: 'var(--bg-panel-alt)', color: 'var(--clr-text-dim)', cursor: 'not-allowed' }) }}
-            onClick={texSaveVariant} disabled={!texVariantId}>Save Override</button>
           {showSaveAs && (
             <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
               <input style={{ ...s.inputFull, flex: 1, fontSize: '10px' }}
@@ -1206,7 +1202,7 @@ export default function Studio() {
               <input style={{ ...s.input, width:'50px' }} type="number"
                 value={saveForm.order} onChange={e=>setSaveForm(f=>({...f,order:Number(e.target.value)}))} />
             </div>
-            <button style={s.btn} onClick={saveVariant}>Save Variant</button>
+            <button style={s.btn} onClick={saveAll}>Save</button>
             {saveStatus==='ok' && <span style={s.ok}>Saved!</span>}
             {saveStatus && saveStatus!=='ok' && <span style={s.err}>{saveStatus}</span>}
           </div>}
@@ -1254,9 +1250,6 @@ export default function Studio() {
               <input type="range" min={0} max={255} value={alpha} onChange={e => setAlpha(Number(e.target.value))}
                 style={{ width: '60px', accentColor: 'var(--clr-accent)' }} title={`Alpha: ${alpha}`} />
             </>}
-            <div style={{ width: '1px', height: '18px', background: 'var(--bdr-dk)', margin: '0 2px' }} />
-            <button title="Toggle Grid" style={{ ...s.btnSm, ...(showGrid ? { background:'var(--bg-btn-active)', borderTopColor:'var(--bdr-dk)', borderLeftColor:'var(--bdr-dk)', borderRightColor:'var(--bdr-input-lt)', borderBottomColor:'var(--bdr-input-lt)' } : {}) }}
-              onClick={() => setShowGrid(g => !g)}>⊞ Grid</button>
           </div>
 
           {/* 3D viewer */}
@@ -1266,18 +1259,8 @@ export default function Studio() {
                 initialCamera={initialCamera} showNavCube
                 enablePaint={editTab !== 'modeler' && !!texPath && tool !== 'drag'} onPaintUV={onPaintUV} texturePatch={texturePatch} paintTexPath={texPath} />
             : <div style={{ color:'var(--clr-text-dim)', padding:'2rem', fontSize:'0.9rem' }}>Select a body to preview.</div>}
-          {/* Viewer toggle bar */}
-          <div style={{ position:'absolute', top:'10px', left:'10px', display:'flex', flexDirection:'column', gap:'4px', alignItems:'flex-start' }}>
-            {!createPartMode && (bodyMiniJem || activeParts.length > 0) && (
-              <div style={{ display:'flex', gap:'3px', background:'rgba(0,0,0,0.65)', borderRadius:'4px', padding:'3px 6px', maxWidth:'90vw', overflowX:'auto' }}>
-                <button style={{ ...s.btnSm, whiteSpace:'nowrap', ...(composeSelItem?.kind==='body' ? { background:'var(--clr-accent)', color:'#fff' } : {}) }}
-                  onClick={() => setComposeSelItem({kind:'body'})}>Body</button>
-                {activeParts.map(p => (
-                  <button key={p.id} style={{ ...s.btnSm, whiteSpace:'nowrap', ...(composeSelItem?.kind==='part'&&composeSelItem.partId===p.id ? { background:'var(--clr-accent)', color:'#fff' } : {}) }}
-                    onClick={() => setComposeSelItem({kind:'part', partId:p.id})}>{p.name}</button>
-                ))}
-              </div>
-            )}
+          {/* Grid toggle */}
+          <div style={{ position:'absolute', top:'10px', left:'10px' }}>
             <button
               style={{ ...s.btnSm, ...(showGrid ? { background:'var(--bg-btn-active)', borderTop:'1px solid var(--bdr-dk)', borderLeft:'1px solid var(--bdr-dk)', borderRight:'1px solid var(--bdr-input-lt)', borderBottom:'1px solid var(--bdr-input-lt)' } : {}) }}
               onClick={() => setShowGrid(g => !g)}>⊞ Grid</button>
@@ -1375,36 +1358,9 @@ export default function Studio() {
                 {hoverPixel && texBuf && <span style={{ marginLeft:'auto', fontSize:'10px', color:'var(--clr-text-dim)', fontFamily:'Monocraft, sans-serif' }}>({hoverPixel[0]},{hoverPixel[1]})</span>}
               </div>
 
-              {!partEditMode && <div style={s.section}>
-                <div style={s.secHead}>Variant Override</div>
-                <div style={s.secBody}>
-                  <select style={s.select} value={texVariantId} onChange={e=>setTexVariantId(e.target.value)}>
-                    <option value="">— none —</option>
-                    {bodyVariants.map(v => (
-                      <option key={v.id} value={v.id}>
-                        {v.file_name}{v.texture_override ? ' ✓' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {texVariantId && (() => {
-                    const v = variants.find(x => String(x.id) === texVariantId)
-                    return v?.texture_override
-                      ? <div style={{ ...s.infoRow, color:'var(--clr-ok)', marginTop:'4px' }}>Override set</div>
-                      : <div style={{ ...s.infoRow, marginTop:'4px' }}>No override — uses body texture</div>
-                  })()}
-                </div>
-              </div>}
-
               <div style={{ display:'flex', gap:'6px', alignItems:'center', flexWrap:'wrap', padding:'0 4px 8px' }}>
                 <button style={s.btn} onClick={texSave}>Save PNG</button>
                 <button style={s.btn} onClick={texSaveAs}>Save As</button>
-                {partEditMode
-                  ? <button style={s.btn} onClick={texSave} title="Save texture to this part's file">Save as Variant Part</button>
-                  : <button style={{ ...s.btn, ...(texVariantId ? {} : { background: 'var(--bg-panel-alt)', borderTopColor:'var(--bdr-lt)', borderLeftColor:'var(--bdr-lt)', borderRightColor:'var(--bdr-dk)', borderBottomColor:'var(--bdr-dk)', color:'var(--clr-text-dim)', cursor:'not-allowed' }) }}
-                      onClick={texSaveVariant} disabled={!texVariantId} title="Save as per-variant texture override">
-                      Save Override
-                    </button>
-                }
                 {texStatus==='ok' && <span style={s.ok}>Saved!</span>}
                 {texStatus && texStatus!=='ok' && <span style={s.err}>{texStatus}</span>}
               </div>

@@ -53,6 +53,7 @@ export default function Parts() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [error, setError] = useState('')
   const [jsonErrors, setJsonErrors] = useState({})
+  const [confirmId, setConfirmId] = useState(null)
 
   useEffect(() => {
     api.getParts().then(setParts)
@@ -117,9 +118,9 @@ export default function Parts() {
   }
 
   async function del(id) {
-    if (!confirm('Delete this part?')) return
     await api.deletePart(id)
     setParts(ps => ps.filter(p => p.id !== id))
+    setConfirmId(null)
   }
 
   function getBaseModel(part) {
@@ -184,6 +185,24 @@ export default function Parts() {
 
       <button style={{ ...s.btn, marginBottom: '1rem' }} onClick={openNew}>+ New Part</button>
 
+      {confirmId !== null && (() => {
+        const part = parts.find(p => p.id === confirmId)
+        return (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
+            <div style={{ background:'var(--bg-window)', borderTop:'2px solid var(--bdr-lt)', borderLeft:'2px solid var(--bdr-lt)', borderRight:'2px solid var(--bdr-dk)', borderBottom:'2px solid var(--bdr-dk)', padding:'20px 24px', minWidth:'280px', fontFamily:'Monocraft, sans-serif' }}>
+              <div style={{ ...XP_TITLE, marginBottom:'14px' }}>Confirm Delete</div>
+              <div style={{ fontSize:'11px', color:'var(--clr-text)', marginBottom:'16px', lineHeight:'1.6' }}>
+                Are you sure you want to delete<br/>
+                <span style={{ color:'var(--clr-accent)', fontWeight:'bold' }}>{part?.name}</span>?<br/>
+                This cannot be undone.
+              </div>
+              <button style={{ ...s.btnDanger, marginRight:'8px' }} onClick={() => del(confirmId)}>Delete</button>
+              <button style={s.btn} onClick={() => setConfirmId(null)}>Cancel</button>
+            </div>
+          </div>
+        )
+      })()}
+
       {grouped.map(([model, modelParts]) => (
         <div key={model} style={{ marginBottom: '1.5rem' }}>
           <div style={{ ...XP_TITLE, marginBottom: '8px', display: 'inline-block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{model}</div>
@@ -197,7 +216,7 @@ export default function Parts() {
                   <div style={s.cardTitle}>{p.name}</div>
                   <div style={s.path}>{p.jpm_path}</div>
                   <button style={s.btn} onClick={() => openEdit(p)}>Edit</button>
-                  <button style={{ ...s.btn, ...s.btnDanger }} onClick={() => del(p.id)}>Delete</button>
+                  <button style={{ ...s.btn, ...s.btnDanger }} onClick={() => setConfirmId(p.id)}>Delete</button>
                 </div>
               </div>
             ))}

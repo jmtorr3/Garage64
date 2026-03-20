@@ -39,6 +39,7 @@ export default function PartsLibrary() {
   const [bodies,  setBodies]  = useState([])
   const [variants, setVariants] = useState([])
   const [picker,  setPicker]  = useState(null)   // bodyName or null
+  const [confirmId, setConfirmId] = useState(null)
 
   useEffect(() => {
     api.getParts().then(setParts)
@@ -58,6 +59,12 @@ export default function PartsLibrary() {
   }
 
   const sections = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b))
+
+  async function deletePart(id) {
+    await api.deletePart(id)
+    setParts(ps => ps.filter(p => p.id !== id))
+    setConfirmId(null)
+  }
 
   function findPreset(bodyName, type) {
     const kws = PART_TYPES.find(t => t.id === type)?.keywords || []
@@ -137,21 +144,29 @@ export default function PartsLibrary() {
                   <div style={{ padding: '7px 9px' }}>
                     <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '3px', color: 'var(--clr-text)' }}>{p.name}</div>
                     <div style={{ fontSize: '9px', color: 'var(--clr-text-dim)', marginBottom: '7px', wordBreak: 'break-all' }}>{p.jpm_path}</div>
-                    <button
-                      style={{ ...XP_BTN, fontSize: '10px' }}
-                      onClick={() => {
-                        const variant = variants.find(v => v.body_name === bodyName)
-                        const body    = bodies.find(b => b.name === bodyName)
-                        const params  = new URLSearchParams()
-                        if (variant) params.set('variantId', String(variant.id))
-                        if (body)    params.set('bodyId',    String(body.id))
-                        params.set('presetPartId', String(p.id))
-                        params.set('newPart', '1')
-                        navigate(`/studio?${params}`)
-                      }}
-                    >
-                      Edit in Studio
-                    </button>
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                      <button
+                        style={{ ...XP_BTN, fontSize: '10px' }}
+                        onClick={() => {
+                          const variant = variants.find(v => v.body_name === bodyName)
+                          const body    = bodies.find(b => b.name === bodyName)
+                          const params  = new URLSearchParams()
+                          if (variant) params.set('variantId', String(variant.id))
+                          if (body)    params.set('bodyId',    String(body.id))
+                          params.set('presetPartId', String(p.id))
+                          params.set('newPart', '1')
+                          navigate(`/studio?${params}`)
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        style={{ ...XP_BTN, fontSize: '10px', background: 'var(--bg-btn-danger)', color: '#fff' }}
+                        onClick={() => setConfirmId(p.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -159,6 +174,24 @@ export default function PartsLibrary() {
           )}
         </div>
       ))}
+
+      {confirmId !== null && (() => {
+        const part = parts.find(p => p.id === confirmId)
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+            <div style={{ background: 'var(--bg-window)', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)', padding: '20px 24px', minWidth: '280px', fontFamily: 'Monocraft, sans-serif' }}>
+              <div style={{ ...XP_TITLE, marginBottom: '14px' }}>Confirm Delete</div>
+              <div style={{ fontSize: '11px', color: 'var(--clr-text)', marginBottom: '16px', lineHeight: '1.6' }}>
+                Are you sure you want to delete<br />
+                <span style={{ color: 'var(--clr-accent)', fontWeight: 'bold' }}>{part?.name}</span>?<br />
+                This cannot be undone.
+              </div>
+              <button style={{ ...XP_BTN, background: 'var(--bg-btn-danger)', color: '#fff', marginRight: '8px' }} onClick={() => deletePart(confirmId)}>Delete</button>
+              <button style={XP_BTN} onClick={() => setConfirmId(null)}>Cancel</button>
+            </div>
+          </div>
+        )
+      })()}
 
     </div>
   )

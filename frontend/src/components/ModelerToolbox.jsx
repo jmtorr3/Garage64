@@ -37,7 +37,6 @@ const TOOLS = [
 
 export default function ModelerToolbox({
   tcMode, setTcMode,
-  showGrid, setShowGrid,
   addCube,
   deleteSelected, hasSel,
   undoCount, redoCount, onUndo, onRedo,
@@ -91,11 +90,6 @@ export default function ModelerToolbox({
       {/* Undo / Redo */}
       <button title="Undo (Ctrl+Z)" style={{ ...TBTN, ...(undoCount ? {} : TBTN_DIS) }} onClick={onUndo} disabled={!undoCount}>↩</button>
       <button title="Redo (Ctrl+Shift+Z)" style={{ ...TBTN, ...(redoCount ? {} : TBTN_DIS) }} onClick={onRedo} disabled={!redoCount}>↪</button>
-
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', margin: '1px 0' }} />
-
-      {/* Grid */}
-      <button title="Toggle Grid" style={{ ...TBTN, ...(showGrid ? TBTN_ACT : {}), fontSize: '15px' }} onClick={() => setShowGrid(v => !v)}>⊞</button>
 
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', margin: '1px 0' }} />
 
