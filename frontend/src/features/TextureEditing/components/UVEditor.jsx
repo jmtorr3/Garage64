@@ -6,32 +6,32 @@
  */
 
 import { useEffect, useState } from 'react'
-import { api } from '../api'
-import UVCanvas from '../components/UVCanvas'
+import { api } from '../../../api'
+import UVCanvas from './UVCanvas'
 
 const XP_INPUT = { padding: '3px 6px', background: 'var(--bg-input)', color: 'var(--clr-text)', borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)', fontFamily: 'Monocraft, sans-serif', fontSize: '11px' }
 
 const s = {
-  page:        { display: 'flex', gap: '6px', height: 'calc(100vh - 48px)', overflow: 'hidden', background: 'var(--bg-window)', padding: '6px' },
-  panel:       { width: '280px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto' },
-  canvas:      { flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto' },
-  section:     { background: 'var(--bg-window)', overflow: 'hidden', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)' },
-  secHead:     { background: 'var(--bg-title)', color: 'var(--clr-text-on-title)', padding: '2px 8px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'Monocraft, sans-serif', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid var(--bdr-dk)' },
-  secBody:     { padding: '6px 8px' },
-  select:      { ...XP_INPUT, width: '100%', boxSizing: 'border-box' },
-  treeItem:    { padding: '2px 4px', cursor: 'pointer', fontSize: '11px', userSelect: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'Monocraft, sans-serif' },
-  faceRow:     { display: 'flex', alignItems: 'center', gap: '6px', padding: '2px 0', fontSize: '11px' },
-  dot:         { width: '10px', height: '10px', flexShrink: 0 },
-  coordLabel:  { width: '18px', color: 'var(--clr-text-dim)', fontSize: '10px', textAlign: 'right', flexShrink: 0, fontFamily: 'Monocraft, sans-serif' },
-  numInput:    { width: '46px', ...XP_INPUT },
-  btn:         { padding: '4px 16px', background: 'var(--bg-btn-primary)', borderTop: '2px solid var(--bdr-btn-primary-lt)', borderLeft: '2px solid var(--bdr-btn-primary-lt)', borderRight: '2px solid var(--bdr-btn-primary-dk)', borderBottom: '2px solid var(--bdr-btn-primary-dk)', color: '#fff', fontFamily: 'Monocraft, sans-serif', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', marginTop: '4px' },
-  btnSm:       { padding: '2px 8px', background: 'var(--bg-btn)', borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', cursor: 'pointer', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
-  ok:          { color: 'var(--clr-ok)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
-  err:         { color: 'var(--clr-err)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
-  offsetRow:   { display: 'flex', gap: '6px', alignItems: 'center', padding: '3px 0', fontSize: '11px' },
+  page: { display: 'flex', gap: '6px', height: 'calc(100vh - 48px)', overflow: 'hidden', background: 'var(--bg-window)', padding: '6px' },
+  panel: { width: '280px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto' },
+  canvas: { flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto' },
+  section: { background: 'var(--bg-window)', overflow: 'hidden', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)' },
+  secHead: { background: 'var(--bg-title)', color: 'var(--clr-text-on-title)', padding: '2px 8px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'Monocraft, sans-serif', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid var(--bdr-dk)' },
+  secBody: { padding: '6px 8px' },
+  select: { ...XP_INPUT, width: '100%', boxSizing: 'border-box' },
+  treeItem: { padding: '2px 4px', cursor: 'pointer', fontSize: '11px', userSelect: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'Monocraft, sans-serif' },
+  faceRow: { display: 'flex', alignItems: 'center', gap: '6px', padding: '2px 0', fontSize: '11px' },
+  dot: { width: '10px', height: '10px', flexShrink: 0 },
+  coordLabel: { width: '18px', color: 'var(--clr-text-dim)', fontSize: '10px', textAlign: 'right', flexShrink: 0, fontFamily: 'Monocraft, sans-serif' },
+  numInput: { width: '46px', ...XP_INPUT },
+  btn: { padding: '4px 16px', background: 'var(--bg-btn-primary)', borderTop: '2px solid var(--bdr-btn-primary-lt)', borderLeft: '2px solid var(--bdr-btn-primary-lt)', borderRight: '2px solid var(--bdr-btn-primary-dk)', borderBottom: '2px solid var(--bdr-btn-primary-dk)', color: '#fff', fontFamily: 'Monocraft, sans-serif', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', marginTop: '4px' },
+  btnSm: { padding: '2px 8px', background: 'var(--bg-btn)', borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', cursor: 'pointer', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
+  ok: { color: 'var(--clr-ok)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
+  err: { color: 'var(--clr-err)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
+  offsetRow: { display: 'flex', gap: '6px', alignItems: 'center', padding: '3px 0', fontSize: '11px' },
   offsetLabel: { color: 'var(--clr-text-dim)', width: '14px', textAlign: 'right', fontSize: '10px', fontFamily: 'Monocraft, sans-serif' },
-  tabBar:      { display: 'flex', gap: '2px', background: 'var(--bg-panel)', borderBottom: '2px solid var(--bdr-dk)', padding: '4px 4px 0' },
-  tab:         { flex: 1, padding: '3px 0', textAlign: 'center', borderRadius: '3px 3px 0 0', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: '1px solid var(--bdr-dk)', borderBottom: 'none', fontFamily: 'Monocraft, sans-serif', background: 'var(--bg-panel-alt)', color: 'var(--clr-text-dim)' },
+  tabBar: { display: 'flex', gap: '2px', background: 'var(--bg-panel)', borderBottom: '2px solid var(--bdr-dk)', padding: '4px 4px 0' },
+  tab: { flex: 1, padding: '3px 0', textAlign: 'center', borderRadius: '3px 3px 0 0', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: '1px solid var(--bdr-dk)', borderBottom: 'none', fontFamily: 'Monocraft, sans-serif', background: 'var(--bg-panel-alt)', color: 'var(--clr-text-dim)' },
 }
 
 const FACE_COLORS = {
@@ -90,27 +90,27 @@ export default function UVEditor() {
   const [mode, setMode] = useState('part')  // 'part' | 'body'
 
   // Part mode
-  const [parts,        setParts]        = useState([])
-  const [partId,       setPartId]       = useState(null)
-  const [partData,     setPartData]     = useState(null)
+  const [parts, setParts] = useState([])
+  const [partId, setPartId] = useState(null)
+  const [partData, setPartData] = useState(null)
   const [origPartData, setOrigPartData] = useState(null)
-  const [attachMeta,   setAttachMeta]   = useState(null)
+  const [attachMeta, setAttachMeta] = useState(null)
 
   // Body mode
-  const [bodies,        setBodies]        = useState([])
-  const [bodyId,        setBodyId]        = useState(null)
-  const [bodyObj,       setBodyObj]       = useState(null)   // full body object from API
-  const [bodyData,      setBodyData]      = useState(null)   // live-edited body_data
-  const [origBodyData,  setOrigBodyData]  = useState(null)
-  const [bodyModelIdx,  setBodyModelIdx]  = useState(0)
+  const [bodies, setBodies] = useState([])
+  const [bodyId, setBodyId] = useState(null)
+  const [bodyObj, setBodyObj] = useState(null)   // full body object from API
+  const [bodyData, setBodyData] = useState(null)   // live-edited body_data
+  const [origBodyData, setOrigBodyData] = useState(null)
+  const [bodyModelIdx, setBodyModelIdx] = useState(0)
 
   // Shared
-  const [boxes,        setBoxes]        = useState([])
-  const [boxIdx,       setBoxIdx]       = useState(0)
+  const [boxes, setBoxes] = useState([])
+  const [boxIdx, setBoxIdx] = useState(0)
   const [selectedFace, setSelectedFace] = useState(null)
-  const [img,          setImg]          = useState(null)
-  const [textureSize,  setTextureSize]  = useState([64, 32])
-  const [status,       setStatus]       = useState('')
+  const [img, setImg] = useState(null)
+  const [textureSize, setTextureSize] = useState([64, 32])
+  const [status, setStatus] = useState('')
 
   // Load lists on mount
   useEffect(() => {
@@ -183,7 +183,7 @@ export default function UVEditor() {
   }, [mode, attachMeta, bodyData, bodyModelIdx])
 
   const currentEntry = boxes[boxIdx] || null
-  const currentBox   = currentEntry?.box || null
+  const currentBox = currentEntry?.box || null
 
   // ── box change ─────────────────────────────────────────────────────────────
 
@@ -319,19 +319,19 @@ export default function UVEditor() {
             {boxes.length === 0
               ? <span style={{ color: 'var(--clr-text-dim)', fontSize: '0.8rem' }}>No boxes</span>
               : boxes.map((entry, i) => (
-                  <div
-                    key={entry.path}
-                    style={{
-                      ...s.treeItem,
-                      background: i === boxIdx ? 'var(--clr-accent)' : 'transparent',
-                      color: i === boxIdx ? '#fff' : 'var(--clr-text-dim)',
-                    }}
-                    onClick={() => { setBoxIdx(i); setSelectedFace(null) }}
-                    title={entry.path}
-                  >
-                    {entry.path}
-                  </div>
-                ))
+                <div
+                  key={entry.path}
+                  style={{
+                    ...s.treeItem,
+                    background: i === boxIdx ? 'var(--clr-accent)' : 'transparent',
+                    color: i === boxIdx ? '#fff' : 'var(--clr-text-dim)',
+                  }}
+                  onClick={() => { setBoxIdx(i); setSelectedFace(null) }}
+                  title={entry.path}
+                >
+                  {entry.path}
+                </div>
+              ))
             }
           </div>
         </div>

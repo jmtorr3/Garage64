@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { api } from '../api'
-import CemViewer from '../components/CemViewer'
+import { api } from '../../api'
+import CemViewer from '../../components/CemViewer'
 
 function partToJem(part) {
   const meta = part.attachment_meta || {}
@@ -14,28 +14,28 @@ function partToJem(part) {
   }
 }
 
-const XP_BTN    = { padding: '4px 14px', background: 'var(--bg-btn)', borderTop: '2px solid var(--bdr-btn-lt)', borderLeft: '2px solid var(--bdr-btn-lt)', borderRight: '2px solid var(--bdr-btn-dk)', borderBottom: '2px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', fontFamily: 'Monocraft, sans-serif', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }
-const XP_INPUT  = { width: '100%', padding: '3px 6px', background: 'var(--bg-input)', color: 'var(--clr-text)', borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)', fontFamily: 'Monocraft, sans-serif', fontSize: '11px', boxSizing: 'border-box' }
-const XP_TITLE  = { background: 'var(--bg-title)', color: 'var(--clr-text-on-title)', padding: '3px 8px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'Monocraft, sans-serif', letterSpacing: '0.04em' }
+const XP_BTN = { padding: '4px 14px', background: 'var(--bg-btn)', borderTop: '2px solid var(--bdr-btn-lt)', borderLeft: '2px solid var(--bdr-btn-lt)', borderRight: '2px solid var(--bdr-btn-dk)', borderBottom: '2px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', fontFamily: 'Monocraft, sans-serif', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }
+const XP_INPUT = { width: '100%', padding: '3px 6px', background: 'var(--bg-input)', color: 'var(--clr-text)', borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)', fontFamily: 'Monocraft, sans-serif', fontSize: '11px', boxSizing: 'border-box' }
+const XP_TITLE = { background: 'var(--bg-title)', color: 'var(--clr-text-on-title)', padding: '3px 8px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'Monocraft, sans-serif', letterSpacing: '0.04em' }
 
 const s = {
-  heading:   { fontSize: '13px', marginBottom: '1.25rem', color: 'var(--clr-accent)', fontWeight: 'bold', fontFamily: 'Monocraft, sans-serif' },
-  grid:      { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '8px' },
-  card:      { background: 'var(--bg-window)', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)', display: 'flex', flexDirection: 'column' },
-  cardInfo:  { padding: '8px 10px' },
-  viewer:    { height: '180px', background: '#1a1a2e', flexShrink: 0 },
+  heading: { fontSize: '13px', marginBottom: '1.25rem', color: 'var(--clr-accent)', fontWeight: 'bold', fontFamily: 'Monocraft, sans-serif' },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '8px' },
+  card: { background: 'var(--bg-window)', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)', display: 'flex', flexDirection: 'column' },
+  cardInfo: { padding: '8px 10px' },
+  viewer: { height: '180px', background: '#1a1a2e', flexShrink: 0 },
   cardTitle: { fontWeight: 'bold', marginBottom: '3px', color: 'var(--clr-text)', fontFamily: 'Monocraft, sans-serif', fontSize: '12px' },
-  path:      { fontSize: '10px', color: 'var(--clr-text-dim)', marginBottom: '8px', wordBreak: 'break-all', fontFamily: 'monospace' },
-  btn:       { ...XP_BTN, marginRight: '6px' },
+  path: { fontSize: '10px', color: 'var(--clr-text-dim)', marginBottom: '8px', wordBreak: 'break-all', fontFamily: 'monospace' },
+  btn: { ...XP_BTN, marginRight: '6px' },
   btnDanger: { ...XP_BTN, background: 'var(--bg-btn-danger)', borderTop: '2px solid var(--bdr-btn-danger-lt)', borderLeft: '2px solid var(--bdr-btn-danger-lt)', borderRight: '2px solid var(--bdr-btn-danger-dk)', borderBottom: '2px solid var(--bdr-btn-danger-dk)', color: '#fff', marginRight: '6px' },
-  form:      { background: 'var(--bg-panel)', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)', padding: '12px', marginBottom: '1.5rem' },
+  form: { background: 'var(--bg-panel)', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)', padding: '12px', marginBottom: '1.5rem' },
   formTitle: { ...XP_TITLE, display: 'block', marginBottom: '10px' },
-  row:       { marginBottom: '8px' },
-  label:     { display: 'block', fontSize: '11px', color: 'var(--clr-text-dim)', marginBottom: '2px', fontFamily: 'Monocraft, sans-serif' },
-  input:     XP_INPUT,
-  textarea:  { ...XP_INPUT, minHeight: '120px', resize: 'vertical' },
-  error:     { color: 'var(--clr-err)', fontSize: '11px', margin: '6px 0', fontFamily: 'Monocraft, sans-serif' },
-  jsonErr:   { color: 'var(--clr-err)', fontSize: '10px', fontFamily: 'Monocraft, sans-serif' },
+  row: { marginBottom: '8px' },
+  label: { display: 'block', fontSize: '11px', color: 'var(--clr-text-dim)', marginBottom: '2px', fontFamily: 'Monocraft, sans-serif' },
+  input: XP_INPUT,
+  textarea: { ...XP_INPUT, minHeight: '120px', resize: 'vertical' },
+  error: { color: 'var(--clr-err)', fontSize: '11px', margin: '6px 0', fontFamily: 'Monocraft, sans-serif' },
+  jsonErr: { color: 'var(--clr-err)', fontSize: '10px', fontFamily: 'Monocraft, sans-serif' },
 }
 
 const EMPTY_FORM = {
@@ -131,7 +131,7 @@ export default function Parts() {
   const grouped = Object.entries(
     parts.reduce((acc, p) => {
       const key = getBaseModel(p)
-      ;(acc[key] = acc[key] || []).push(p)
+        ; (acc[key] = acc[key] || []).push(p)
       return acc
     }, {})
   ).sort(([a], [b]) => a.localeCompare(b))
@@ -188,15 +188,15 @@ export default function Parts() {
       {confirmId !== null && (() => {
         const part = parts.find(p => p.id === confirmId)
         return (
-          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
-            <div style={{ background:'var(--bg-window)', borderTop:'2px solid var(--bdr-lt)', borderLeft:'2px solid var(--bdr-lt)', borderRight:'2px solid var(--bdr-dk)', borderBottom:'2px solid var(--bdr-dk)', padding:'20px 24px', minWidth:'280px', fontFamily:'Monocraft, sans-serif' }}>
-              <div style={{ ...XP_TITLE, marginBottom:'14px' }}>Confirm Delete</div>
-              <div style={{ fontSize:'11px', color:'var(--clr-text)', marginBottom:'16px', lineHeight:'1.6' }}>
-                Are you sure you want to delete<br/>
-                <span style={{ color:'var(--clr-accent)', fontWeight:'bold' }}>{part?.name}</span>?<br/>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+            <div style={{ background: 'var(--bg-window)', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)', padding: '20px 24px', minWidth: '280px', fontFamily: 'Monocraft, sans-serif' }}>
+              <div style={{ ...XP_TITLE, marginBottom: '14px' }}>Confirm Delete</div>
+              <div style={{ fontSize: '11px', color: 'var(--clr-text)', marginBottom: '16px', lineHeight: '1.6' }}>
+                Are you sure you want to delete<br />
+                <span style={{ color: 'var(--clr-accent)', fontWeight: 'bold' }}>{part?.name}</span>?<br />
                 This cannot be undone.
               </div>
-              <button style={{ ...s.btnDanger, marginRight:'8px' }} onClick={() => del(confirmId)}>Delete</button>
+              <button style={{ ...s.btnDanger, marginRight: '8px' }} onClick={() => del(confirmId)}>Delete</button>
               <button style={s.btn} onClick={() => setConfirmId(null)}>Cancel</button>
             </div>
           </div>

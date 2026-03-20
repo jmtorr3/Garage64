@@ -1,16 +1,16 @@
 import { useState } from 'react'
-import { api } from '../api'
+import { api } from '../../api'
 
 const s = {
-  heading:    { fontSize: '13px', marginBottom: '4px', color: 'var(--clr-accent)', fontWeight: 'bold', fontFamily: 'Monocraft, sans-serif' },
-  sub:        { color: 'var(--clr-text-dim)', fontSize: '11px', marginBottom: '1.5rem', fontFamily: 'Monocraft, sans-serif' },
-  box:        { background: 'var(--bg-panel)', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)', padding: '16px', maxWidth: '520px' },
-  btn:        { fontSize: '12px', padding: '6px 20px', cursor: 'pointer', background: 'var(--bg-btn-primary)', borderTop: '2px solid var(--bdr-btn-primary-lt)', borderLeft: '2px solid var(--bdr-btn-primary-lt)', borderRight: '2px solid var(--bdr-btn-primary-dk)', borderBottom: '2px solid var(--bdr-btn-primary-dk)', color: '#fff', fontWeight: 'bold', fontFamily: 'Monocraft, sans-serif' },
-  btnDisabled:{ background: 'var(--bg-panel-alt)', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)', color: 'var(--clr-text-dim)', cursor: 'not-allowed' },
-  status:     { marginTop: '10px', padding: '8px 10px', fontSize: '11px', fontFamily: 'Monocraft, sans-serif', borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-lt)', borderBottom: '2px solid var(--bdr-lt)' },
-  ok:         { background: 'var(--clr-badge-bg)', color: 'var(--clr-ok)', border: 'none' },
-  err:        { background: 'var(--bg-section)', color: 'var(--clr-err)', border: 'none' },
-  errList:    { marginTop: '4px', paddingLeft: '1rem', fontSize: '11px' },
+  heading: { fontSize: '13px', marginBottom: '4px', color: 'var(--clr-accent)', fontWeight: 'bold', fontFamily: 'Monocraft, sans-serif' },
+  sub: { color: 'var(--clr-text-dim)', fontSize: '11px', marginBottom: '1.5rem', fontFamily: 'Monocraft, sans-serif' },
+  box: { background: 'var(--bg-panel)', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)', padding: '16px', maxWidth: '520px' },
+  btn: { fontSize: '12px', padding: '6px 20px', cursor: 'pointer', background: 'var(--bg-btn-primary)', borderTop: '2px solid var(--bdr-btn-primary-lt)', borderLeft: '2px solid var(--bdr-btn-primary-lt)', borderRight: '2px solid var(--bdr-btn-primary-dk)', borderBottom: '2px solid var(--bdr-btn-primary-dk)', color: '#fff', fontWeight: 'bold', fontFamily: 'Monocraft, sans-serif' },
+  btnDisabled: { background: 'var(--bg-panel-alt)', borderTop: '2px solid var(--bdr-lt)', borderLeft: '2px solid var(--bdr-lt)', borderRight: '2px solid var(--bdr-dk)', borderBottom: '2px solid var(--bdr-dk)', color: 'var(--clr-text-dim)', cursor: 'not-allowed' },
+  status: { marginTop: '10px', padding: '8px 10px', fontSize: '11px', fontFamily: 'Monocraft, sans-serif', borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-lt)', borderBottom: '2px solid var(--bdr-lt)' },
+  ok: { background: 'var(--clr-badge-bg)', color: 'var(--clr-ok)', border: 'none' },
+  err: { background: 'var(--bg-section)', color: 'var(--clr-err)', border: 'none' },
+  errList: { marginTop: '4px', paddingLeft: '1rem', fontSize: '11px' },
 }
 
 export default function Export() {
