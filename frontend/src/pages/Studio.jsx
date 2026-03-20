@@ -232,8 +232,9 @@ export default function Studio() {
   const [hoverPixel,   setHoverPixel]   = useState(null)
   const [texStatus,    setTexStatus]    = useState('')
   const [viewerVer,    setViewerVer]    = useState(0)
-  const canvasRef  = useRef(null)
-  const bufRef     = useRef(null)
+  const canvasRef     = useRef(null)
+  const bufRef        = useRef(null)
+  const uvOverlayRef  = useRef(null)   // { rects, selFace } from Modeler
   const drawingRef = useRef(false)
   const undoRef    = useRef([])
   const redoRef    = useRef([])
@@ -480,6 +481,28 @@ export default function Studio() {
       for (let x = 0; x <= tw; x++) { ctx.beginPath(); ctx.moveTo(x*zoom,0); ctx.lineTo(x*zoom,th*zoom); ctx.stroke() }
       for (let y = 0; y <= th; y++) { ctx.beginPath(); ctx.moveTo(0,y*zoom); ctx.lineTo(tw*zoom,y*zoom); ctx.stroke() }
     }
+    // UV overlay from block editor selection
+    const uvo = uvOverlayRef.current
+    if (uvo) {
+      const FACE_COLORS = { north:'#ff4455', south:'#44dd66', east:'#4499ff', west:'#ffcc00', up:'#44ffdd', down:'#ff44cc' }
+      for (const rects of uvo.rectSets) {
+        for (const [face, r] of Object.entries(rects)) {
+          if (!r) continue
+          const [x1,y1,x2,y2] = r
+          const color = FACE_COLORS[face] || '#fff'
+          const isSel = face === uvo.selFace
+          const sx = Math.min(x1,x2)*zoom, sy = Math.min(y1,y2)*zoom
+          const sw = Math.abs(x2-x1)*zoom,  sh = Math.abs(y2-y1)*zoom
+          ctx.fillStyle = color + (isSel ? '66' : '30')
+          ctx.fillRect(sx, sy, sw, sh)
+          ctx.strokeStyle = color; ctx.lineWidth = isSel ? 2 : 1
+          ctx.strokeRect(sx+0.5, sy+0.5, sw-1, sh-1)
+          const ls = Math.max(6, zoom-1)
+          ctx.font = `bold ${ls}px monospace`; ctx.fillStyle = color
+          ctx.fillText(face[0].toUpperCase(), sx+2, sy+ls+1)
+        }
+      }
+    }
   }, [zoom])
 
   redrawRef.current = redraw
@@ -585,6 +608,7 @@ export default function Studio() {
 
   function switchEditTab(tab) {
     if (texPath && bufRef.current) setTexturePatch({ path: texPath, canvas: bufRef.current })
+    if (tab !== 'modeler') uvOverlayRef.current = null
     setEditTab(tab)
   }
 
@@ -1292,6 +1316,8 @@ export default function Studio() {
               onBack={() => switchEditTab('texture')}
               onBarUpdate={setModelerBar}
               showGridProp={showGrid}
+              uvZoom={zoom}
+              onUvChange={data => { uvOverlayRef.current = data; redrawRef.current?.() }}
               />
           ) : (
           <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:'0', background:'var(--bg-panel)', minHeight:0 }}>

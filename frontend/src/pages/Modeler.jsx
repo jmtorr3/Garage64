@@ -146,6 +146,15 @@ function getFaceRects(box) {
   return { north:box.uvNorth, south:box.uvSouth, east:box.uvEast, west:box.uvWest, up:box.uvUp, down:box.uvDown }
 }
 
+// ── UV helpers (shared) ───────────────────────────────────────────────────────
+
+function collectBoxes(model) {
+  const result = []
+  for (const box of (model.boxes || [])) result.push(box)
+  for (const sub of (model.submodels || [])) result.push(...collectBoxes(sub))
+  return result
+}
+
 // ── Model move helpers ────────────────────────────────────────────────────────
 
 // Remove node at modelPath, return [newModels, removedNode]
@@ -357,7 +366,7 @@ function Vec3Input({label, value=[0,0,0], step=0.5, onChange}) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBodyId, onBack, embedded = false, sharedViewerRef = null, texturePatch = null, showBodyPreview = null, previewParts = null, onBarUpdate = null, showGridProp = null, newPart = false } = {}, ref) {
+const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBodyId, onBack, embedded = false, sharedViewerRef = null, texturePatch = null, showBodyPreview = null, previewParts = null, onBarUpdate = null, showGridProp = null, newPart = false, uvZoom = null, onUvChange = null } = {}, ref) {
   const [searchParams] = useSearchParams()
   const { isDark } = useTheme()
   const bg = isDark ? '#1e1e1e' : '#ece9d8'
@@ -410,6 +419,9 @@ const [selFace,  setSelFace]  = useState(null)
   const [showBody, setShowBody] = useState(false)
   const uvCanvasRef  = useRef(null)
   const uvBufRef     = useRef(null)
+  const uvZoomRef    = useRef(1)
+  const uvDragRef    = useRef(null)
+  const [uvCursor,   setUvCursor]   = useState('default')
   const selFaceRef   = useRef(null)
   const bodyGroupRef = useRef(null)
   useEffect(()=>{ selFaceRef.current = selFace },[selFace])
@@ -847,6 +859,7 @@ const [selFace,  setSelFace]  = useState(null)
 
   function clearSel() {
     setSel(null)
+    onUvChange?.(null)
     const ctx=ctxRef.current; if (!ctx) return
     ctx.tc.detach(); clearHelper()
   }
@@ -854,9 +867,11 @@ const [selFace,  setSelFace]  = useState(null)
   const redrawUV = useCallback(() => {
     const canvas = uvCanvasRef.current
     const buf = uvBufRef.current
-    if (!canvas || !buf) return
+    if (!canvas) return
+    if (!buf) { canvas.width = 0; canvas.height = 0; return }
     const { width: tw, height: th } = buf
-    const zoom = Math.max(1, Math.floor(250 / Math.max(tw, 1)))
+    const zoom = (uvZoom && uvZoom > 0) ? uvZoom : Math.max(1, Math.floor(250 / Math.max(tw, 1)))
+    uvZoomRef.current = zoom
     canvas.width = tw * zoom; canvas.height = th * zoom
     const ctx = canvas.getContext('2d')
     // checkerboard
@@ -872,17 +887,27 @@ const [selFace,  setSelFace]  = useState(null)
       for (let x = 0; x <= tw; x++) { ctx.beginPath(); ctx.moveTo(x*zoom,0); ctx.lineTo(x*zoom,th*zoom); ctx.stroke() }
       for (let y = 0; y <= th; y++) { ctx.beginPath(); ctx.moveTo(0,y*zoom); ctx.lineTo(tw*zoom,y*zoom); ctx.stroke() }
     }
-    // UV overlay for selected box
-    const box = selRef.current?.kind === 'box'
-      ? getNode(dataRef.current?.models, selRef.current.modelPath)?.boxes?.[selRef.current.boxIdx]
-      : null
-    if (box) {
+    // UV overlay for selected element(s)
+    const cur = selRef.current
+    let boxList = []
+    let singleBox = false
+    if (cur?.kind === 'box') {
+      const b = getNode(dataRef.current?.models, cur.modelPath)?.boxes?.[cur.boxIdx]
+      if (b) { boxList = [b]; singleBox = true }
+    } else if (cur?.kind === 'model') {
+      const node = getNode(dataRef.current?.models, cur.modelPath)
+      if (node) boxList = collectBoxes(node)
+    }
+
+    const rectSets = []
+    for (const box of boxList) {
       const rects = getFaceRects(box)
+      rectSets.push(rects)
       for (const face of FACES) {
         const r = rects[face]; if (!r) continue
         const [x1,y1,x2,y2] = r
         const color = FACE_COLORS[face]
-        const isSel = face === selFaceRef.current
+        const isSel = singleBox && face === selFaceRef.current
         const sx = Math.min(x1,x2)*zoom, sy = Math.min(y1,y2)*zoom
         const sw = Math.abs(x2-x1)*zoom, sh = Math.abs(y2-y1)*zoom
         ctx.globalAlpha = 1
@@ -895,7 +920,113 @@ const [selFace,  setSelFace]  = useState(null)
         ctx.fillText(face[0].toUpperCase(), sx+2, sy+ls+1)
       }
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+    if (rectSets.length) {
+      onUvChange?.({ rectSets, selFace: singleBox ? selFaceRef.current : null })
+    } else {
+      onUvChange?.(null)
+    }
+  }, [uvZoom, onUvChange]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── UV canvas interaction ─────────────────────────────────────────────────
+
+  function getUVHit(px, py, box) {
+    const rects = getFaceRects(box)
+    for (const face of FACES) {
+      const r = rects[face]; if (!r) continue
+      const [x1,y1,x2,y2] = r
+      const sx = Math.min(x1,x2), sy = Math.min(y1,y2)
+      const sw = Math.abs(x2-x1), sh = Math.abs(y2-y1)
+      if (px >= sx && px < sx+sw && py >= sy && py < sy+sh) return face
+    }
+    return null
+  }
+
+  function patchBoxLive(updater) {
+    if (!selRef.current || selRef.current.kind !== 'box' || !dataRef.current) return
+    const { modelPath, boxIdx } = selRef.current
+    dataRef.current = {
+      ...dataRef.current,
+      models: updateNode(dataRef.current.models, modelPath, n => {
+        const boxes = [...(n.boxes||[])]
+        boxes[boxIdx] = updater(boxes[boxIdx])
+        return {...n, boxes}
+      })
+    }
+    redrawUV()
+  }
+
+  function onUVMouseDown(e) {
+    if (e.button !== 0) return
+    const buf = uvBufRef.current; if (!buf) return
+    const cur = selRef.current
+    const box = cur?.kind === 'box'
+      ? getNode(dataRef.current?.models, cur.modelPath)?.boxes?.[cur.boxIdx]
+      : null
+    if (!box) return
+
+    const zoom = uvZoomRef.current
+    const rect = uvCanvasRef.current.getBoundingClientRect()
+    const px = (e.clientX - rect.left) / zoom
+    const py = (e.clientY - rect.top)  / zoom
+
+    const hitFace = getUVHit(px, py, box)
+    if (!hitFace) return
+
+    const origData = JSON.stringify(dataRef.current)
+
+    if (box.textureOffset) {
+      uvDragRef.current = { startPx: px, startPy: py, startVal: [...box.textureOffset], mode: 'offset', origData }
+    } else {
+      const key = 'uv' + hitFace[0].toUpperCase() + hitFace.slice(1)
+      setSelFace(hitFace)
+      uvDragRef.current = { startPx: px, startPy: py, startVal: [...(box[key]||[0,0,0,0])], face: hitFace, mode: 'face', origData }
+    }
+    setUvCursor('grabbing')
+  }
+
+  function onUVMouseMove(e) {
+    const buf = uvBufRef.current; if (!buf) return
+    const zoom = uvZoomRef.current
+    const rect = uvCanvasRef.current.getBoundingClientRect()
+    const px = (e.clientX - rect.left) / zoom
+    const py = (e.clientY - rect.top)  / zoom
+
+    const drag = uvDragRef.current
+    if (!drag) {
+      // Update hover cursor
+      const cur = selRef.current
+      const box = cur?.kind === 'box'
+        ? getNode(dataRef.current?.models, cur.modelPath)?.boxes?.[cur.boxIdx]
+        : null
+      setUvCursor(box && getUVHit(px, py, box) ? 'grab' : 'default')
+      return
+    }
+
+    const dx = Math.round(px - drag.startPx)
+    const dy = Math.round(py - drag.startPy)
+
+    if (drag.mode === 'offset') {
+      patchBoxLive(b => ({...b, textureOffset: [drag.startVal[0]+dx, drag.startVal[1]+dy]}))
+    } else {
+      const [x1,y1,x2,y2] = drag.startVal
+      const key = 'uv' + drag.face[0].toUpperCase() + drag.face.slice(1)
+      patchBoxLive(b => ({...b, [key]: [x1+dx, y1+dy, x2+dx, y2+dy]}))
+    }
+  }
+
+  function onUVCommit() {
+    const drag = uvDragRef.current; if (!drag) return
+    uvDragRef.current = null
+    setUvCursor('default')
+    // Push the pre-drag snapshot onto the undo stack
+    undoStackRef.current.push(drag.origData)
+    if (undoStackRef.current.length > 100) undoStackRef.current.shift()
+    redoStackRef.current = []
+    setDataVer(v => v+1)
+    setDirty(true)
+    notifyBar()
+  }
 
   // ── Body preview ───────────────────────────────────────────────────────────
 
@@ -1248,6 +1379,24 @@ const [selFace,  setSelFace]  = useState(null)
           {/* Resize handle */}
           <div onMouseDown={startRPanelResize} style={{position:'absolute',left:0,top:0,bottom:0,width:4,cursor:'col-resize',zIndex:10,background:'transparent'}} />
           <div style={XP_TITLE}>Properties</div>
+
+          {/* ── UV / Texture canvas ── */}
+          <div style={{flexShrink:0, borderBottom:'2px solid var(--bdr-dk)', background:'#111', lineHeight:0, position:'relative', overflow:'auto', maxHeight:220}}>
+            <canvas ref={uvCanvasRef}
+              style={{display:'block', imageRendering:'pixelated', cursor:uvCursor}}
+              onMouseDown={onUVMouseDown}
+              onMouseMove={onUVMouseMove}
+              onMouseUp={onUVCommit}
+              onMouseLeave={onUVCommit}
+            />
+            {!uvBufRef.current && (
+              <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',
+                color:'rgba(255,255,255,0.2)',fontSize:'10px',fontFamily:'Monocraft,sans-serif',pointerEvents:'none'}}>
+                no texture
+              </div>
+            )}
+          </div>
+
           <div style={{flex:1,overflowY:'auto',padding:'8px',minHeight:0}}>
 
             {!sel&&(
