@@ -210,7 +210,7 @@ function adjustPath(srcPath, tgtPath) {
 
 // ── Outliner ──────────────────────────────────────────────────────────────────
 
-function OutlinerNode({model, modelPath, sel, multiSel, onSel, onDragStart, onDrop, depth=0, hiddenModels, onToggleVisible, onRename, onDelete, openNodes, onToggleOpen, onOpenNode}) {
+function OutlinerNode({model, modelPath, sel, multiSel, onSel, onDragStart, onDrop, depth=0, hiddenModels, onToggleVisible, onRename, onDelete, onRenameBox, onDeleteBox, openNodes, onToggleOpen, onOpenNode}) {
   const open = openNodes?.has(modelPath.join('_')) ?? false
   const [editing,setEditing]=useState(false)
   const [editVal,setEditVal]=useState('')
@@ -293,13 +293,15 @@ function OutlinerNode({model, modelPath, sel, multiSel, onSel, onDragStart, onDr
           const bSel=(multiSel||[]).some(s=>s.kind==='box'&&selKey(s)===selKey(boxSel))
           return (
             <BoxRow key={bi} box={box} bi={bi} indent={indent} bSel={bSel} modelPath={modelPath}
-              onSel={onSel} onDragStart={onDragStart} onDrop={onDrop} boxSel={boxSel}/>
+              onSel={onSel} onDragStart={onDragStart} onDrop={onDrop} boxSel={boxSel}
+              onRename={onRenameBox} onDelete={onDeleteBox}/>
           )
         })}
         {(model.submodels||[]).map((sub,si)=>(
           <OutlinerNode key={si} model={sub} modelPath={[...modelPath,si]} sel={sel} multiSel={multiSel} onSel={onSel}
             onDragStart={onDragStart} onDrop={onDrop} depth={depth+1}
             hiddenModels={hiddenModels} onToggleVisible={onToggleVisible} onRename={onRename} onDelete={onDelete}
+            onRenameBox={onRenameBox} onDeleteBox={onDeleteBox}
             openNodes={openNodes} onToggleOpen={onToggleOpen} onOpenNode={onOpenNode}/>
         ))}
       </>}
@@ -343,24 +345,67 @@ function RootDropZone({onDrop}) {
   )
 }
 
-function BoxRow({box, bi, indent, bSel, modelPath, onSel, onDragStart, onDrop, boxSel}) {
-  const [dropOver, setDropOver]=useState(false)
+function BoxRow({box, bi, indent, bSel, modelPath, onSel, onDragStart, onDrop, boxSel, onRename, onDelete}) {
+  const [dropOver, setDropOver] = useState(false)
+  const [ctxMenu,  setCtxMenu]  = useState(null)
+  const [editing,  setEditing]  = useState(false)
+  const [editVal,  setEditVal]  = useState('')
+
+  useEffect(()=>{
+    if (!ctxMenu) return
+    function close(){setCtxMenu(null)}
+    window.addEventListener('click', close)
+    window.addEventListener('contextmenu', close)
+    return ()=>{window.removeEventListener('click',close);window.removeEventListener('contextmenu',close)}
+  },[ctxMenu])
+
+  const displayName = box.name || `cube ${bi}`
+
   return (
-    <div draggable
-      onDragStart={e=>{e.stopPropagation();onDragStart({kind:'box',modelPath,boxIdx:bi})}}
-      onDragOver={e=>{e.preventDefault();e.stopPropagation();setDropOver(true)}}
-      onDragLeave={()=>setDropOver(false)}
-      onDrop={e=>{e.stopPropagation();setDropOver(false);onDrop({kind:'box',modelPath,boxIdx:bi})}}
-      style={{...s.treeRow, paddingLeft:4+indent+18,
-        background:bSel?'var(--clr-accent)':dropOver?'rgba(100,160,255,0.18)':'transparent',
-        color:bSel?'#fff':'var(--clr-text)',
-        outline:dropOver?'1px dashed #4488ff':'none', cursor:'grab'}}
-      onClick={e=>onSel(boxSel,e.shiftKey,e.ctrlKey||e.metaKey)}>
-      <span style={{color:bSel?'#fff':'#ffaa55'}}>□</span>
-      <span>cube {bi}</span>
-      {box.coordinates&&<span style={{color:'rgba(160,160,160,0.5)',fontSize:'10px',marginLeft:4}}>
-        {box.coordinates.slice(0,3).map(v=>Math.round(v)).join(',')}
-      </span>}
+    <div>
+      <div draggable
+        onDragStart={e=>{e.stopPropagation();onDragStart({kind:'box',modelPath,boxIdx:bi})}}
+        onDragOver={e=>{e.preventDefault();e.stopPropagation();setDropOver(true)}}
+        onDragLeave={()=>setDropOver(false)}
+        onDrop={e=>{e.stopPropagation();setDropOver(false);onDrop({kind:'box',modelPath,boxIdx:bi})}}
+        style={{...s.treeRow, paddingLeft:4+indent+18,
+          background:bSel?'var(--clr-accent)':dropOver?'rgba(100,160,255,0.18)':'transparent',
+          color:bSel?'#fff':'var(--clr-text)',
+          outline:dropOver?'1px dashed #4488ff':'none', cursor:'grab'}}
+        onClick={e=>onSel(boxSel,e.shiftKey,e.ctrlKey||e.metaKey)}
+        onContextMenu={e=>{e.preventDefault();e.stopPropagation();onSel(boxSel,false,false);setCtxMenu({x:e.clientX,y:e.clientY})}}>
+        <span style={{color:bSel?'#fff':'#ffaa55'}}>□</span>
+        {editing
+          ? <input autoFocus value={editVal}
+              style={{background:'var(--bg-panel)',color:'var(--clr-text)',border:'1px solid var(--clr-accent)',borderRadius:2,width:'80%',fontSize:'inherit',padding:'0 2px'}}
+              onChange={e=>setEditVal(e.target.value)}
+              onBlur={()=>{if(editVal.trim()&&onRename)onRename(modelPath,bi,editVal.trim());setEditing(false)}}
+              onKeyDown={e=>{if(e.key==='Enter'){if(editVal.trim()&&onRename)onRename(modelPath,bi,editVal.trim());setEditing(false)}else if(e.key==='Escape')setEditing(false);e.stopPropagation()}}
+              onClick={e=>e.stopPropagation()}/>
+          : <span onDoubleClick={e=>{e.stopPropagation();setEditVal(box.name||'');setEditing(true)}}>{displayName}</span>}
+        {box.coordinates&&<span style={{color:'rgba(160,160,160,0.5)',fontSize:'10px',marginLeft:4}}>
+          {box.coordinates.slice(0,3).map(v=>Math.round(v)).join(',')}
+        </span>}
+      </div>
+      {ctxMenu&&<div
+        style={{position:'fixed',left:ctxMenu.x,top:ctxMenu.y,zIndex:9999,
+          background:'var(--bg-panel)',border:'1px solid rgba(255,255,255,0.12)',
+          borderRadius:4,padding:'2px 0',boxShadow:'2px 4px 16px rgba(0,0,0,0.5)',minWidth:160}}
+        onClick={e=>e.stopPropagation()}>
+        <div style={{padding:'5px 14px',cursor:'pointer',fontSize:'12px'}}
+          onMouseEnter={e=>e.currentTarget.style.background='var(--clr-accent)'}
+          onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+          onClick={()=>{setCtxMenu(null);setEditVal(box.name||'');setEditing(true)}}>
+          Rename
+        </div>
+        <div style={{height:1,background:'rgba(255,255,255,0.1)',margin:'2px 0'}}/>
+        <div style={{padding:'5px 14px',cursor:'pointer',fontSize:'12px',color:'#f77'}}
+          onMouseEnter={e=>e.currentTarget.style.background='rgba(255,80,80,0.15)'}
+          onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+          onClick={()=>{setCtxMenu(null);onDelete&&onDelete(modelPath,bi)}}>
+          Delete
+        </div>
+      </div>}
     </div>
   )
 }
@@ -1364,6 +1409,19 @@ const [selFace,  setSelFace]  = useState(null)
     bump(updateNode(dataRef.current.models,modelPath,n=>({...n,id:newName})))
   }
 
+  function handleRenameBox(modelPath, boxIdx, newName) {
+    bump(updateNode(dataRef.current.models, modelPath, n => {
+      const boxes=[...(n.boxes||[])]; boxes[boxIdx]={...boxes[boxIdx],name:newName}; return {...n,boxes}
+    }))
+  }
+
+  function handleDeleteBox(modelPath, boxIdx) {
+    bump(updateNode(dataRef.current.models, modelPath, n => {
+      const boxes=[...(n.boxes||[])]; boxes.splice(boxIdx,1); return {...n,boxes}
+    }))
+    clearSel()
+  }
+
   async function save() {
     setStatus('')
     try {
@@ -1531,6 +1589,29 @@ const [selFace,  setSelFace]  = useState(null)
       return
     }
 
+    // Move cube into/between models (box → model row, or box → box in different model)
+    if (src.kind==='box' && (target.kind==='model' || (target.kind==='box' && JSON.stringify(src.modelPath)!==JSON.stringify(target.modelPath)))) {
+      const srcNode = getNode(data.models, src.modelPath)
+      const box = srcNode?.boxes?.[src.boxIdx]
+      if (!box) return
+      const targetModelPath = target.kind==='model' ? target.modelPath : target.modelPath
+      const targetBoxIdx    = target.kind==='box'   ? target.boxIdx   : null
+      pushUndo()
+      // Remove from source model
+      let models = updateNode(data.models, src.modelPath, n => {
+        const boxes = [...(n.boxes||[])]; boxes.splice(src.boxIdx, 1); return {...n, boxes}
+      })
+      // Insert into target model
+      models = updateNode(models, targetModelPath, n => {
+        const boxes = [...(n.boxes||[])]
+        targetBoxIdx !== null ? boxes.splice(targetBoxIdx, 0, box) : boxes.push(box)
+        return {...n, boxes}
+      })
+      dataRef.current = {...data, models}
+      setDataVer(v=>v+1); setDirty(true); clearSel()
+      return
+    }
+
     if (src.kind==='model' && target.kind==='model') {
       const sp = src.modelPath, tp = target.modelPath
       if (JSON.stringify(sp) === JSON.stringify(tp)) return
@@ -1647,7 +1728,7 @@ const [selFace,  setSelFace]  = useState(null)
           <div style={{flex:1,overflowY:'auto',display:'flex',flexDirection:'column'}}>
             <div style={{flex:1}}>
               {(data?.models||[]).map((model,mi)=>(
-                <OutlinerNode key={mi} model={model} modelPath={[mi]} sel={sel} multiSel={multiSel} onSel={selectAndAttach} onDragStart={handleDragStart} onDrop={handleDrop} depth={0} hiddenModels={hiddenModels} onToggleVisible={toggleModelVisible} onRename={handleRename} onDelete={deleteModel} openNodes={openNodes} onToggleOpen={toggleOpen} onOpenNode={openNode}/>
+                <OutlinerNode key={mi} model={model} modelPath={[mi]} sel={sel} multiSel={multiSel} onSel={selectAndAttach} onDragStart={handleDragStart} onDrop={handleDrop} depth={0} hiddenModels={hiddenModels} onToggleVisible={toggleModelVisible} onRename={handleRename} onDelete={deleteModel} onRenameBox={handleRenameBox} onDeleteBox={handleDeleteBox} openNodes={openNodes} onToggleOpen={toggleOpen} onOpenNode={openNode}/>
               ))}
             </div>
             {/* Root drop zone — drag here to move a model back to top level */}
