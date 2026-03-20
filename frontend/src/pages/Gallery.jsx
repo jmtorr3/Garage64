@@ -2,63 +2,63 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import CemViewer from '../components/CemViewer'
-import Export from './Export'
+import Export from '../features/Export/index.jsx'
 import { useTheme } from '../ThemeContext'
 
-const XP_BTN   = { fontSize: '11px', padding: '3px 10px', cursor: 'pointer', background: 'var(--bg-btn)', borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', fontFamily: 'Monocraft, sans-serif', fontWeight: 'bold' }
+const XP_BTN = { fontSize: '11px', padding: '3px 10px', cursor: 'pointer', background: 'var(--bg-btn)', borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', fontFamily: 'Monocraft, sans-serif', fontWeight: 'bold' }
 const XP_INPUT = { width: '100%', padding: '3px 6px', background: 'var(--bg-input)', color: 'var(--clr-text)', borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)', fontFamily: 'Monocraft, sans-serif', fontSize: '11px', boxSizing: 'border-box' }
 
 const s = {
-  page:       { display: 'flex', height: 'calc(100vh - 48px)', overflow: 'hidden', margin: '-1.5rem -2rem' },
-  sidebar:    { width: '260px', flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '2px solid var(--bdr-dk)', overflow: 'hidden', background: 'var(--bg-panel)' },
-  sideHead:   { display: 'flex', alignItems: 'center', padding: '4px 8px', borderBottom: '2px solid var(--bdr-dk)', gap: '6px', flexShrink: 0, background: 'var(--bg-title)' },
-  sideTitle:  { flex: 1, fontWeight: 'bold', color: 'var(--clr-text-on-title)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'Monocraft, sans-serif' },
-  list:       { flex: 1, overflowY: 'auto' },
-  item:       { padding: '6px 8px', cursor: 'pointer', borderBottom: '1px solid var(--bg-panel-alt)', display: 'flex', flexDirection: 'column', gap: '2px' },
-  itemName:   { fontSize: '12px', fontWeight: 'bold', fontFamily: 'Monocraft, sans-serif' },
-  itemSub:    { fontSize: '10px', color: 'var(--clr-text-dim)', fontFamily: 'Monocraft, sans-serif' },
-  itemParts:  { display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '3px' },
-  badge:      { fontSize: '10px', background: 'var(--clr-badge-bg)', border: '1px solid var(--clr-badge-border)', color: 'var(--clr-badge-text)', padding: '1px 5px', fontFamily: 'Monocraft, sans-serif' },
-  itemBtns:   { display: 'flex', gap: '4px', marginTop: '5px' },
-  btnSm:      XP_BTN,
-  btnDanger:  { ...XP_BTN, background: 'var(--bg-btn-danger)', borderTop: '1px solid var(--bdr-btn-danger-lt)', borderLeft: '1px solid var(--bdr-btn-danger-lt)', borderRight: '1px solid var(--bdr-btn-danger-dk)', borderBottom: '1px solid var(--bdr-btn-danger-dk)', color: '#fff' },
+  page: { display: 'flex', height: 'calc(100vh - 48px)', overflow: 'hidden', margin: '-1.5rem -2rem' },
+  sidebar: { width: '260px', flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '2px solid var(--bdr-dk)', overflow: 'hidden', background: 'var(--bg-panel)' },
+  sideHead: { display: 'flex', alignItems: 'center', padding: '4px 8px', borderBottom: '2px solid var(--bdr-dk)', gap: '6px', flexShrink: 0, background: 'var(--bg-title)' },
+  sideTitle: { flex: 1, fontWeight: 'bold', color: 'var(--clr-text-on-title)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'Monocraft, sans-serif' },
+  list: { flex: 1, overflowY: 'auto' },
+  item: { padding: '6px 8px', cursor: 'pointer', borderBottom: '1px solid var(--bg-panel-alt)', display: 'flex', flexDirection: 'column', gap: '2px' },
+  itemName: { fontSize: '12px', fontWeight: 'bold', fontFamily: 'Monocraft, sans-serif' },
+  itemSub: { fontSize: '10px', color: 'var(--clr-text-dim)', fontFamily: 'Monocraft, sans-serif' },
+  itemParts: { display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '3px' },
+  badge: { fontSize: '10px', background: 'var(--clr-badge-bg)', border: '1px solid var(--clr-badge-border)', color: 'var(--clr-badge-text)', padding: '1px 5px', fontFamily: 'Monocraft, sans-serif' },
+  itemBtns: { display: 'flex', gap: '4px', marginTop: '5px' },
+  btnSm: XP_BTN,
+  btnDanger: { ...XP_BTN, background: 'var(--bg-btn-danger)', borderTop: '1px solid var(--bdr-btn-danger-lt)', borderLeft: '1px solid var(--bdr-btn-danger-lt)', borderRight: '1px solid var(--bdr-btn-danger-dk)', borderBottom: '1px solid var(--bdr-btn-danger-dk)', color: '#fff' },
   // form
-  formPanel:  { flex: 1, overflowY: 'auto', padding: '8px', display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--bg-panel)' },
-  formTitle:  { fontWeight: 'bold', color: 'var(--clr-text)', fontSize: '12px', marginBottom: '2px', fontFamily: 'Monocraft, sans-serif' },
-  label:      { display: 'block', fontSize: '11px', color: 'var(--clr-text-dim)', marginBottom: '2px', fontFamily: 'Monocraft, sans-serif' },
-  input:      XP_INPUT,
-  checkRow:   { display: 'flex', alignItems: 'center', gap: '7px', fontSize: '11px', padding: '2px 0', fontFamily: 'Monocraft, sans-serif' },
-  btn:        { padding: '4px 16px', background: 'var(--bg-btn-primary)', borderTop: '2px solid var(--bdr-btn-primary-lt)', borderLeft: '2px solid var(--bdr-btn-primary-lt)', borderRight: '2px solid var(--bdr-btn-primary-dk)', borderBottom: '2px solid var(--bdr-btn-primary-dk)', color: '#fff', fontFamily: 'Monocraft, sans-serif', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' },
-  error:      { color: 'var(--clr-err)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
+  formPanel: { flex: 1, overflowY: 'auto', padding: '8px', display: 'flex', flexDirection: 'column', gap: '6px', background: 'var(--bg-panel)' },
+  formTitle: { fontWeight: 'bold', color: 'var(--clr-text)', fontSize: '12px', marginBottom: '2px', fontFamily: 'Monocraft, sans-serif' },
+  label: { display: 'block', fontSize: '11px', color: 'var(--clr-text-dim)', marginBottom: '2px', fontFamily: 'Monocraft, sans-serif' },
+  input: XP_INPUT,
+  checkRow: { display: 'flex', alignItems: 'center', gap: '7px', fontSize: '11px', padding: '2px 0', fontFamily: 'Monocraft, sans-serif' },
+  btn: { padding: '4px 16px', background: 'var(--bg-btn-primary)', borderTop: '2px solid var(--bdr-btn-primary-lt)', borderLeft: '2px solid var(--bdr-btn-primary-lt)', borderRight: '2px solid var(--bdr-btn-primary-dk)', borderBottom: '2px solid var(--bdr-btn-primary-dk)', color: '#fff', fontFamily: 'Monocraft, sans-serif', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' },
+  error: { color: 'var(--clr-err)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
   // viewer
-  main:       { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-window)' },
-  viewerBar:  { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 10px', borderBottom: '2px solid var(--bdr-dk)', flexShrink: 0, background: 'var(--bg-panel)' },
-  varName:    { fontWeight: 'bold', fontSize: '12px', fontFamily: 'Monocraft, sans-serif' },
-  hint:       { color: 'var(--clr-text-dim)', fontSize: '10px', marginLeft: 'auto', fontFamily: 'Monocraft, sans-serif' },
+  main: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-window)' },
+  viewerBar: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 10px', borderBottom: '2px solid var(--bdr-dk)', flexShrink: 0, background: 'var(--bg-panel)' },
+  varName: { fontWeight: 'bold', fontSize: '12px', fontFamily: 'Monocraft, sans-serif' },
+  hint: { color: 'var(--clr-text-dim)', fontSize: '10px', marginLeft: 'auto', fontFamily: 'Monocraft, sans-serif' },
   viewerWrap: { flex: 1, overflow: 'hidden' },
-  empty:      { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--clr-text-dim)', fontSize: '12px', fontFamily: 'Monocraft, sans-serif' },
-  errTxt:     { color: 'var(--clr-err)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
-  loadTxt:    { color: 'var(--clr-text-dim)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
+  empty: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--clr-text-dim)', fontSize: '12px', fontFamily: 'Monocraft, sans-serif' },
+  errTxt: { color: 'var(--clr-err)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
+  loadTxt: { color: 'var(--clr-text-dim)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
 }
 
 const EMPTY_FORM = { file_name: '', trigger_name: '', body: '', order: 1, part_ids: [] }
 
 export default function Gallery() {
-  const navigate  = useNavigate()
+  const navigate = useNavigate()
   const viewerRef = useRef(null)
   const { isDark } = useTheme()
   const bg = isDark ? '#1e1e1e' : '#ece9d8'
-  const [gTab,        setGTab]        = useState('cars')  // 'cars' | 'export'
-  const [variants,    setVariants]    = useState([])
-  const [parts,       setParts]       = useState([])
-  const [bodies,      setBodies]      = useState([])
-  const [selectedId,  setSelectedId]  = useState(null)
-  const [jem,         setJem]         = useState(null)
-  const [loading,     setLoading]     = useState(false)
-  const [viewError,   setViewError]   = useState('')
-  const [editing,     setEditing]     = useState(null)   // null | 'new' | variant.id
-  const [form,        setForm]        = useState(EMPTY_FORM)
-  const [formError,   setFormError]   = useState('')
+  const [gTab, setGTab] = useState('cars')  // 'cars' | 'export'
+  const [variants, setVariants] = useState([])
+  const [parts, setParts] = useState([])
+  const [bodies, setBodies] = useState([])
+  const [selectedId, setSelectedId] = useState(null)
+  const [jem, setJem] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [viewError, setViewError] = useState('')
+  const [editing, setEditing] = useState(null)   // null | 'new' | variant.id
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [formError, setFormError] = useState('')
 
   useEffect(() => {
     api.getVariants().then(vs => { setVariants(vs); if (vs.length) setSelectedId(vs[vs.length - 1].id) })
@@ -247,7 +247,7 @@ export default function Gallery() {
                           const ctx = viewerRef.current?.getCtx()
                           if (ctx) sessionStorage.setItem('garage64_camera', JSON.stringify({
                             position: ctx.camera.position.toArray(),
-                            target:   ctx.controls.target.toArray(),
+                            target: ctx.controls.target.toArray(),
                           }))
                           navigate(`/studio?variantId=${v.id}`)
                         }}>Edit</button>
@@ -271,7 +271,7 @@ export default function Gallery() {
                 {selectedVariant.variant_parts?.map(vp => (
                   <span key={vp.id} style={{ ...s.badge, fontSize: '0.75rem' }}>+{vp.part.name}</span>
                 ))}
-                {loading  && <span style={s.loadTxt}>loading…</span>}
+                {loading && <span style={s.loadTxt}>loading…</span>}
                 {viewError && <span style={s.errTxt}>{viewError}</span>}
                 <span style={s.hint}>drag · scroll · right-drag</span>
               </div>
