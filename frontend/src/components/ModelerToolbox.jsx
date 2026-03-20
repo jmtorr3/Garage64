@@ -32,6 +32,7 @@ const TBTN_DIS = { opacity: 0.3, cursor: 'default' }
 const TOOLS = [
   { id: 'translate', icon: '⤢', label: 'Move (W)' },
   { id: 'rotate',    icon: '↻', label: 'Rotate (E)' },
+  { id: 'scale',     icon: '⤡', label: 'Scale (R)' },
   { id: 'pivot',     icon: '⊙', label: 'Move Pivot' },
 ]
 

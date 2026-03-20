@@ -595,6 +595,9 @@ const [selFace,  setSelFace]  = useState(null)
 
     const tc = new TransformControls(extCtx.camera, extCtx.renderer.domElement)
     tc.setMode('translate')
+    tc.setTranslationSnap(1)
+    tc.setRotationSnap(Math.PI / 12)  // 15°
+    tc.setScaleSnap(0.5)
     extCtx.scene.add(tc)
 
     tc.addEventListener('dragging-changed', e => { extCtx.controls.enabled = !e.value })
@@ -673,6 +676,9 @@ const [selFace,  setSelFace]  = useState(null)
 
     const tc=new TransformControls(camera,renderer.domElement)
     tc.setMode('translate')
+    tc.setTranslationSnap(1)
+    tc.setRotationSnap(Math.PI / 12)  // 15°
+    tc.setScaleSnap(0.5)
     scene.add(tc)
 
     // Pause orbit while dragging gizmo
@@ -734,7 +740,10 @@ const [selFace,  setSelFace]  = useState(null)
   useEffect(()=>{
     const tc=ctxRef.current?.tc; if (!tc) return
     const internalMode = tcMode === 'pivot' ? 'translate' : tcMode
-    if (selRef.current?.kind==='model') tc.setMode(internalMode)
+    const cur = selRef.current
+    if (!cur) return
+    if (cur.kind==='model') tc.setMode(internalMode)
+    else if (cur.kind==='box') tc.setMode(internalMode==='scale' ? 'scale' : 'translate')
   },[tcMode])
 
   // ── Keyboard shortcuts ─────────────────────────────────────────────────────
@@ -859,32 +868,44 @@ const [selFace,  setSelFace]  = useState(null)
     if (sel.kind==='model' && tcModeRef.current==='pivot') {
       // Move pivot only — shift translate, inversely offset boxes and submodels so geometry stays put
       const oldT = model.translate || [0,0,0]
-      const newT = [r(obj.position.x*sx), r(obj.position.y*sy), r(obj.position.z*sz)]
+      const newT = [Math.round(obj.position.x*sx), Math.round(obj.position.y*sy), Math.round(obj.position.z*sz)]
       const d = [newT[0]-oldT[0], newT[1]-oldT[1], newT[2]-oldT[2]]
       newModels = updateNode(data.models, sel.modelPath, n => ({
         ...n,
         translate: newT,
         boxes: (n.boxes||[]).map(box => {
           const [bx=0,by=0,bz=0,...rest] = box.coordinates||[]
-          return {...box, coordinates:[r(bx-d[0]), r(by-d[1]), r(bz-d[2]), ...rest]}
+          return {...box, coordinates:[Math.round(bx-d[0]), Math.round(by-d[1]), Math.round(bz-d[2]), ...rest]}
         }),
         submodels: (n.submodels||[]).map(sub => {
           const [stx=0,sty=0,stz=0] = sub.translate||[]
-          return {...sub, translate:[r(stx-d[0]), r(sty-d[1]), r(stz-d[2])]}
+          return {...sub, translate:[Math.round(stx-d[0]), Math.round(sty-d[1]), Math.round(stz-d[2])]}
         }),
       }))
     } else if (sel.kind==='model') {
       newModels=updateNode(data.models,sel.modelPath,n=>({...n,
-        translate:[r(obj.position.x*sx), r(obj.position.y*sy), r(obj.position.z*sz)],
+        translate:[Math.round(obj.position.x*sx), Math.round(obj.position.y*sy), Math.round(obj.position.z*sz)],
         rotate:   [r(obj.rotation.x/DEG*sx), r(obj.rotation.y/DEG*sy), r(obj.rotation.z/DEG*sz)],
       }))
+    } else if (sel.kind==='box' && tcModeRef.current==='scale') {
+      const box=model.boxes[sel.boxIdx]
+      const [bx=0,by=0,bz=0, bw=1,bh=1,bd=1]=box.coordinates||[]
+      // scaleSnap=0.5 so obj.scale goes in 0.5 steps; clamp to min 1 to avoid zero/negative dims
+      const newW=Math.max(1, Math.round(bw * Math.abs(obj.scale.x)))
+      const newH=Math.max(1, Math.round(bh * Math.abs(obj.scale.y)))
+      const newD=Math.max(1, Math.round(bd * Math.abs(obj.scale.z)))
+      newModels=updateNode(data.models,sel.modelPath,n=>{
+        const boxes=[...n.boxes]
+        boxes[sel.boxIdx]={...box,coordinates:[bx,by,bz,newW,newH,newD]}
+        return {...n,boxes}
+      })
     } else if (sel.kind==='box') {
       const box=model.boxes[sel.boxIdx]
       const [,,, bw=1,bh=1,bd=1]=box.coordinates||[]
       newModels=updateNode(data.models,sel.modelPath,n=>{
         const boxes=[...n.boxes]
         boxes[sel.boxIdx]={...box,coordinates:[
-          r(obj.position.x/sx-bw/2), r(obj.position.y/sy-bh/2), r(obj.position.z/sz-bd/2),
+          Math.round(obj.position.x/sx-bw/2), Math.round(obj.position.y/sy-bh/2), Math.round(obj.position.z/sz-bd/2),
           bw, bh, bd,
         ]}
         return {...n,boxes}
@@ -955,7 +976,9 @@ const [selFace,  setSelFace]  = useState(null)
     if (obj) {
       ctx.tc.attach(obj)
       const internalMode = tcModeRef.current === 'pivot' ? 'translate' : tcModeRef.current
-      ctx.tc.setMode(newSel.kind==='box'?'translate':internalMode)
+      // Boxes support translate and scale (resize); pivot/rotate only apply to models
+      const boxMode = (internalMode === 'scale') ? 'scale' : 'translate'
+      ctx.tc.setMode(newSel.kind==='box' ? boxMode : internalMode)
       attachHelper(obj)
     }
   }
@@ -972,8 +995,10 @@ const [selFace,  setSelFace]  = useState(null)
     const canvas = uvCanvasRef.current
     const buf = uvBufRef.current
     if (!canvas) return
-    if (!buf) { canvas.width = 0; canvas.height = 0; return }
-    const { width: tw, height: th } = buf
+    const confSize = dataRef.current?.textureSize || [64, 32]
+    const tw = buf ? buf.width  : confSize[0]
+    const th = buf ? buf.height : confSize[1]
+    if (!tw || !th) { canvas.width = 0; canvas.height = 0; return }
     const zoom = (uvZoom && uvZoom > 0) ? uvZoom : Math.max(1, Math.floor(250 / Math.max(tw, 1)))
     uvZoomRef.current = zoom
     canvas.width = tw * zoom; canvas.height = th * zoom
@@ -984,7 +1009,7 @@ const [selFace,  setSelFace]  = useState(null)
       ctx.fillRect(x*zoom, y*zoom, zoom, zoom)
     }
     ctx.imageSmoothingEnabled = false
-    ctx.drawImage(buf, 0, 0, tw*zoom, th*zoom)
+    if (buf) ctx.drawImage(buf, 0, 0, tw*zoom, th*zoom)
     // pixel grid
     if (zoom >= 4) {
       ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 0.5
@@ -1197,7 +1222,7 @@ const [selFace,  setSelFace]  = useState(null)
   function autoPackUVs() {
     const cur = selRef.current
     if (!cur || !dataRef.current) return
-    const texW = uvBufRef.current?.width ?? dataRef.current.textureSize?.[0] ?? 64
+    const texW = dataRef.current.textureSize?.[0] ?? uvBufRef.current?.width ?? 64
 
     // Collect all {modelPath, boxIdx, box} for the selected node
     function collectBoxPaths(model, fullPath) {
@@ -1218,10 +1243,7 @@ const [selFace,  setSelFace]  = useState(null)
     }
     if (!items.length) return
 
-    // Only pack boxes that use textureOffset — skip per-face UV boxes
-    // (adding textureOffset to a per-face box overrides its UVs and corrupts the model)
-    const PER_FACE = ['uvNorth','uvSouth','uvEast','uvWest','uvUp','uvDown']
-    const packable = items.filter(({ box }) => !PER_FACE.some(k => k in box))
+    const packable = items
     if (!packable.length) return
 
     // Compute cross-pattern pixel size for each box
@@ -1245,13 +1267,17 @@ const [selFace,  setSelFace]  = useState(null)
       shelf.usedW += pw
     }
 
-    // Apply
+    // Apply — strip per-face UV keys, set textureOffset
+    const PER_FACE = ['uvNorth','uvSouth','uvEast','uvWest','uvUp','uvDown']
     pushUndo()
     let newModels = dataRef.current.models
     for (const { item, u, v } of placements) {
       newModels = updateNode(newModels, item.modelPath, n => {
         const boxes = [...(n.boxes || [])]
-        boxes[item.boxIdx] = { ...boxes[item.boxIdx], textureOffset: [u, v] }
+        const cleaned = { ...boxes[item.boxIdx] }
+        PER_FACE.forEach(k => delete cleaned[k])
+        cleaned.textureOffset = [u, v]
+        boxes[item.boxIdx] = cleaned
         return { ...n, boxes }
       })
     }
@@ -1744,6 +1770,29 @@ const [selFace,  setSelFace]  = useState(null)
           {/* Resize handle */}
           <div onMouseDown={startRPanelResize} style={{position:'absolute',left:0,top:0,bottom:0,width:4,cursor:'col-resize',zIndex:10,background:'transparent'}} />
           <div style={XP_TITLE}>Properties</div>
+
+          {/* ── Texture size ── */}
+          {data && (
+            <div style={{display:'flex',alignItems:'center',gap:4,padding:'4px 6px',borderBottom:'1px solid var(--bdr-dk)',flexShrink:0}}>
+              <span style={{...s.label,marginBottom:0,whiteSpace:'nowrap'}}>Texture</span>
+              {[0,1].map(i=>(
+                <input key={i} type="number" min={1} step={1}
+                  style={{...s.numInput,width:42}}
+                  value={data.textureSize?.[i] ?? (i===0?64:32)}
+                  onChange={e=>{
+                    const v = Math.max(1, parseInt(e.target.value)||1)
+                    const cur = data.textureSize || [64,32]
+                    const next = i===0 ? [v,cur[1]] : [cur[0],v]
+                    pushUndo()
+                    dataRef.current = {...dataRef.current, textureSize: next}
+                    setDataVer(v=>v+1); setDirty(true)
+                    redrawUVRef.current?.()
+                  }}
+                />
+              ))}
+              <span style={{...s.label,marginBottom:0,color:'var(--clr-text-dim)'}}>W × H</span>
+            </div>
+          )}
 
           {/* ── UV / Texture canvas ── */}
           <div style={{flexShrink:0, borderBottom:'2px solid var(--bdr-dk)', background:'#111', lineHeight:0, position:'relative', overflow:'auto', maxHeight:220}}>
