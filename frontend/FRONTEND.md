@@ -281,3 +281,74 @@ Set at build time in the Dockerfile:
 ```dockerfile
 RUN VITE_BASE_URL=/garage64/ npm run build
 ```
+
+## 🚧 Refactoring TODO: Modeler Component Breakdown
+
+The `Modeler` is currently a single monolithic file. To improve maintainability, testing, and navigation, we are actively breaking it down into a modular architecture.
+
+### Phase 1: Pure Logic & Math Extraction
+- [ ] Create `utils/` directory.
+- [ ] Extract Three.js specific helpers (`buildSceneRoot`, `annotateGroup`, `disposeGroup`) to `utils/threeHelpers.js`.
+- [ ] Extract CEM data tree mutators (`getNode`, `updateNode`, `extractModel`, `nestModel`) to `utils/cemData.js`.
+- [ ] Extract UV math and packing logic (`textureOffsetRects`, `getFaceRects`, `autoPackUVs`) to `utils/uvMath.js`.
+- [ ] Verify 3D viewport and UV canvas still function perfectly using the imported utilities.
+
+### Phase 2: State Decoupling
+- [ ] Create `context/ModelerContext.jsx`.
+- [ ] Migrate all core `useRef` data stores (`dataRef`, `origRef`, `undoStackRef`, `redoStackRef`) into the Provider.
+- [ ] Migrate core mutator functions (`pushUndo`, `patchModel`, `syncTCToData`) into the Provider.
+- [ ] Wrap the main `Modeler` component in the `<ModelerProvider>`.
+
+### Phase 3: UI Component Isolation
+- [ ] Create `components/Outliner/` and extract `<OutlinerPanel>`, `<OutlinerNode>`, `<BoxRow>`, and `<RootDropZone>`.
+- [ ] Create `components/Viewport/` and extract the Three.js canvas and `TransformControls` initialization into `<Viewport3D>`.
+- [ ] Create `components/Properties/` and extract the right-hand panel, including `<Vec3Input>`.
+- [ ] Extract the custom 2D canvas logic into `components/Properties/UVEditor.jsx`.
+- [ ] Extract the top toolbar into `components/TopBar.jsx`.
+
+### Phase 4: Final Cleanup
+- [ ] Strip the original `Modeler.jsx` down to a pure layout orchestrator.
+- [ ] Clean up unused imports and verify no unnecessary re-renders are being triggered by the new context.
+
+
+src/
+├── api.js
+├── cem.js
+├── cem.md
+├── App.jsx
+├── main.jsx
+├── ThemeContext.jsx
+│
+├── components/                 <-- GLOBAL: Dumb, reusable UI
+│   ├── CemViewer.jsx
+│   ├── MusicPlayer.jsx
+│   └── NavBar.jsx
+│
+├── features/                   <-- DOMAINS: Heavy logic & local state
+│   ├── Export/
+│   │   └── index.jsx
+│   ├── Modeler/
+│   │   ├── components/
+│   │   │   └── ModelerToolbox.jsx
+│   │   ├── utils/
+│   │   └── index.jsx
+│   ├── Parts/
+│   │   └── index.jsx
+│   ├── Studio/
+│   │   └── index.jsx
+│   ├── TextureEditing/
+│   │   ├── components/
+│   │   │   ├── TexToolbox.jsx
+│   │   │   ├── UVCanvas.jsx
+│   │   │   └── UVEditor.jsx
+│   │   ├── utils/
+│   │   └── index.jsx
+│   ├── Variants/
+│   │   └── index.jsx
+│   └── Viewer/
+│       └── index.jsx
+│
+└── pages/                      <-- ROUTING: High-level layout glue
+    ├── Builder.jsx
+    ├── Gallery.jsx
+    └── PartsLibrary.jsx
