@@ -287,7 +287,7 @@ RUN VITE_BASE_URL=/garage64/ npm run build
 The `Modeler` is currently a single monolithic file. To improve maintainability, testing, and navigation, we are actively breaking it down into a modular architecture.
 
 ### Phase 1: Pure Logic & Math Extraction
-- [ ] Create `utils/` directory.
+- [x] Create `utils/` directory.
 - [ ] Extract Three.js specific helpers (`buildSceneRoot`, `annotateGroup`, `disposeGroup`) to `utils/threeHelpers.js`.
 - [ ] Extract CEM data tree mutators (`getNode`, `updateNode`, `extractModel`, `nestModel`) to `utils/cemData.js`.
 - [ ] Extract UV math and packing logic (`textureOffsetRects`, `getFaceRects`, `autoPackUVs`) to `utils/uvMath.js`.
@@ -351,4 +351,5 @@ src/
 └── pages/                      <-- ROUTING: High-level layout glue
     ├── Builder.jsx
     ├── Gallery.jsx
-    └── PartsLibrary.jsx
+    └── PartsLibrary.
+
