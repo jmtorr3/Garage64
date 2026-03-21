@@ -12,6 +12,9 @@ import { TransformControls } from 'three/examples/jsm/controls/TransformControls
 import { api } from '../../api'
 import { collectTexturePaths, normTexPath, jemToScene } from '../../cem'
 import CemViewer from '../../components/CemViewer'
+import { buildSceneRoot, disposeGroup } from './utils/threeHelpers';
+import { getNode, updateNode, extractModel, nestModel } from './utils/cemData';
+import { getFaceRects, FACES } from './utils/uvMath';
 
 const DEG = Math.PI / 180
 
@@ -39,51 +42,6 @@ const s = {
   ok: { color: 'var(--clr-ok)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
   err: { color: 'var(--clr-err)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
   treeRow: { display: 'flex', alignItems: 'center', gap: '3px', padding: '1px 4px', cursor: 'pointer', fontSize: '11px', fontFamily: 'Monocraft, sans-serif', userSelect: 'none', minHeight: '20px' },
-}
-
-// ── Scene building — uses cem.js for correct rendering, annotates for picking ──
-
-function annotateGroup(group, model, modelPath) {
-  group.userData.cemSel = { kind: 'model', modelPath }
-  let boxIdx = 0, subIdx = 0
-  for (const child of group.children) {
-    if (child.isMesh) {
-      child.userData.cemSel = { kind: 'box', modelPath, boxIdx }; boxIdx++
-    } else if (child.isGroup) {
-      annotateGroup(child, (model.submodels || [])[subIdx], [...modelPath, subIdx]); subIdx++
-    }
-  }
-}
-
-function buildSceneRoot(jem, textureMap) {
-  const root = jemToScene(jem, textureMap)
-  const models = jem.models || []
-  let childIdx = 0
-  for (let mi = 0; mi < models.length; mi++) {
-    if ('model' in models[mi]) continue // skipped by jemToScene
-    if (childIdx < root.children.length) {
-      annotateGroup(root.children[childIdx], models[mi], [mi]); childIdx++
-    }
-  }
-  return root
-}
-
-// ── CEM data utilities ─────────────────────────────────────────────────────────
-
-function getNode(models, modelPath) {
-  if (!models || !modelPath?.length) return null
-  let n = models[modelPath[0]]
-  for (let i = 1; i < modelPath.length; i++) n = n?.submodels?.[modelPath[i]] ?? null
-  return n
-}
-
-function updateNode(models, modelPath, updater) {
-  const clone = JSON.parse(JSON.stringify(models))
-  if (modelPath.length === 1) { clone[modelPath[0]] = updater(clone[modelPath[0]]); return clone }
-  let n = clone[modelPath[0]]
-  for (let i = 1; i < modelPath.length - 1; i++) n = n.submodels[modelPath[i]]
-  n.submodels[modelPath[modelPath.length - 1]] = updater(n.submodels[modelPath[modelPath.length - 1]])
-  return clone
 }
 
 function selKey(sel) {
@@ -129,70 +87,12 @@ function partToJem(part) {
   }
 }
 
-function disposeGroup(group) {
-  group.traverse(obj => {
-    obj.geometry?.dispose()
-    const mats = obj.material ? (Array.isArray(obj.material) ? obj.material : [obj.material]) : []
-    mats.forEach(m => { if (m.map) m.map.dispose(); m.dispose() })
-  })
-}
-
-// ── UV helpers ─────────────────────────────────────────────────────────────────
-const FACE_COLORS = { north: '#ff4455', south: '#44dd66', east: '#4499ff', west: '#ffcc00', up: '#44ffdd', down: '#ff44cc' }
-const FACES = ['north', 'south', 'east', 'west', 'up', 'down']
-
-function textureOffsetRects(u, v, w, h, d) {
-  return {
-    up: [u + d, v, u + d + w, v + d],
-    down: [u + d + w, v, u + 2 * d + w, v + d],
-    west: [u, v + d, u + d, v + d + h],
-    south: [u + d, v + d, u + d + w, v + d + h],
-    east: [u + d + w, v + d, u + 2 * d + w, v + d + h],
-    north: [u + 2 * d + w, v + d, u + 2 * d + 2 * w, v + d + h],
-  }
-}
-
-function getFaceRects(box) {
-  if (!box) return {}
-  if (box.textureOffset) {
-    const [u, v] = box.textureOffset
-    const [, , , w, h, d] = box.coordinates
-    return textureOffsetRects(u, v, w, h, d)
-  }
-  return { north: box.uvNorth, south: box.uvSouth, east: box.uvEast, west: box.uvWest, up: box.uvUp, down: box.uvDown }
-}
-
-// ── UV helpers (shared) ───────────────────────────────────────────────────────
 
 function collectBoxes(model) {
   const result = []
   for (const box of (model.boxes || [])) result.push(box)
   for (const sub of (model.submodels || [])) result.push(...collectBoxes(sub))
   return result
-}
-
-// ── Model move helpers ────────────────────────────────────────────────────────
-
-// Remove node at modelPath, return [newModels, removedNode]
-function extractModel(models, path) {
-  const m = JSON.parse(JSON.stringify(models))
-  const idx = path[path.length - 1]
-  if (path.length === 1) { const [n] = m.splice(idx, 1); return [m, n] }
-  let parent = m[path[0]]
-  for (let i = 1; i < path.length - 1; i++) parent = parent.submodels[path[i]]
-  const [n] = parent.submodels.splice(idx, 1)
-  return [m, n]
-}
-
-// Insert node as last submodel of the node at targetPath (or at top level if targetPath=[])
-function nestModel(models, targetPath, node) {
-  const m = JSON.parse(JSON.stringify(models))
-  if (targetPath.length === 0) { m.push(node); return m }
-  let t = m[targetPath[0]]
-  for (let i = 1; i < targetPath.length; i++) t = t.submodels[targetPath[i]]
-  if (!t.submodels) t.submodels = []
-  t.submodels.push(node)
-  return m
 }
 
 // After removing src at srcPath, the targetPath may shift at the divergence level
