@@ -16,55 +16,14 @@ import CemViewer from '../../components/CemViewer'
 import { buildSceneRoot, disposeGroup } from './utils/threeHelpers';
 import { getNode, updateNode, extractModel, nestModel } from './utils/cemData';
 import { getFaceRects, FACES } from './utils/uvMath';
+import { DEG, XP_TITLE, XP_INPUT, s } from './styles'
+import { selKey, getFlatVisible } from './utils/outlinerUtils'
+import OutlinerPanel from './components/Outliner'
+import TopBar from './components/TopBar'
+import UVEditor from './components/Properties/UVEditor'
+import Vec3Input from './components/Properties/Vec3Input'
 
-const DEG = Math.PI / 180
-
-// ── styles ─────────────────────────────────────────────────────────────────────
-
-const XP_TITLE = { background: 'var(--bg-title)', color: 'var(--clr-text-on-title)', padding: '2px 8px', fontSize: '11px', fontWeight: 'bold', fontFamily: 'Monocraft, sans-serif', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }
-const XP_BTN_SM = { padding: '2px 8px', background: 'var(--bg-btn)', borderTop: '1px solid var(--bdr-btn-lt)', borderLeft: '1px solid var(--bdr-btn-lt)', borderRight: '1px solid var(--bdr-btn-dk)', borderBottom: '1px solid var(--bdr-btn-dk)', color: 'var(--clr-text)', cursor: 'pointer', fontSize: '11px', fontFamily: 'Monocraft, sans-serif', fontWeight: 'bold' }
-const XP_INPUT = { padding: '3px 6px', background: 'var(--bg-input)', color: 'var(--clr-text)', borderTop: '2px solid var(--bdr-dk)', borderLeft: '2px solid var(--bdr-dk)', borderRight: '2px solid var(--bdr-input-lt)', borderBottom: '2px solid var(--bdr-input-lt)', fontFamily: 'Monocraft, sans-serif', fontSize: '11px' }
-
-const s = {
-  page: { display: 'flex', flexDirection: 'column', height: 'calc(100vh - 48px)', background: 'var(--bg-window)', margin: '-1.5rem -2rem', overflow: 'hidden' },
-  topBar: { display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 8px', flexShrink: 0, borderBottom: '2px solid var(--bdr-dk)', background: 'var(--bg-panel)' },
-  content: { flex: 1, display: 'flex', overflow: 'hidden' },
-  outliner: { width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-panel)', borderRight: '2px solid var(--bdr-dk)' },
-  viewport: { flex: 1, position: 'relative', overflow: 'hidden' },
-  rPanel: { flexShrink: 0, position: 'relative', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-panel)', borderLeft: '2px solid var(--bdr-dk)' },
-  label: { color: 'var(--clr-text-dim)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
-  btnSm: XP_BTN_SM,
-  btnAct: { ...XP_BTN_SM, background: 'var(--bg-btn-active)', borderTop: '1px solid var(--bdr-dk)', borderLeft: '1px solid var(--bdr-dk)', borderRight: '1px solid var(--bdr-input-lt)', borderBottom: '1px solid var(--bdr-input-lt)' },
-  btn: { padding: '4px 16px', background: 'var(--bg-btn-primary)', borderTop: '2px solid var(--bdr-btn-primary-lt)', borderLeft: '2px solid var(--bdr-btn-primary-lt)', borderRight: '2px solid var(--bdr-btn-primary-dk)', borderBottom: '2px solid var(--bdr-btn-primary-dk)', color: '#fff', fontFamily: 'Monocraft, sans-serif', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' },
-  divider: { width: 1, height: 22, background: 'var(--bdr-dk)', margin: '0 2px', flexShrink: 0 },
-  select: { ...XP_INPUT },
-  numInput: { ...XP_INPUT, flex: 1, minWidth: '40px' },
-  propLabel: { color: 'var(--clr-text-dim)', fontSize: '10px', fontFamily: 'Monocraft, sans-serif', width: '14px', textAlign: 'right', flexShrink: 0 },
-  ok: { color: 'var(--clr-ok)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
-  err: { color: 'var(--clr-err)', fontSize: '11px', fontFamily: 'Monocraft, sans-serif' },
-  treeRow: { display: 'flex', alignItems: 'center', gap: '3px', padding: '1px 4px', cursor: 'pointer', fontSize: '11px', fontFamily: 'Monocraft, sans-serif', userSelect: 'none', minHeight: '20px' },
-}
-
-function selKey(sel) {
-  if (!sel) return ''
-  return sel.kind === 'model' ? `m_${sel.modelPath.join('_')}` : `b_${sel.modelPath.join('_')}_${sel.boxIdx}`
-}
-
-// Returns flat ordered list of visible outliner items given the open-nodes set
-function getFlatVisible(models, openNodes, prefix = []) {
-  const result = []
-  for (let i = 0; i < (models || []).length; i++) {
-    const model = models[i]
-    const modelPath = [...prefix, i]
-    result.push({ kind: 'model', modelPath })
-    if (openNodes.has(modelPath.join('_'))) {
-      for (let bi = 0; bi < (model.boxes || []).length; bi++)
-        result.push({ kind: 'box', modelPath, boxIdx: bi })
-      result.push(...getFlatVisible(model.submodels, openNodes, modelPath))
-    }
-  }
-  return result
-}
+const FACE_COLORS = { north: '#ff4455', south: '#44dd66', east: '#4499ff', west: '#ffcc00', up: '#44ffdd', down: '#ff44cc' }
 
 function findThreeObj(root, sel) {
   if (!root || !sel) return null
@@ -109,238 +68,6 @@ function adjustPath(srcPath, tgtPath) {
   return adj
 }
 
-// ── Outliner ──────────────────────────────────────────────────────────────────
-
-function OutlinerNode({ model, modelPath, sel, multiSel, onSel, onDragStart, onDrop, depth = 0, hiddenModels, onToggleVisible, onRename, onDelete, onRenameBox, onDeleteBox, openNodes, onToggleOpen, onOpenNode }) {
-  const open = openNodes?.has(modelPath.join('_')) ?? false
-  const [editing, setEditing] = useState(false)
-  const [editVal, setEditVal] = useState('')
-  const [ctxMenu, setCtxMenu] = useState(null)
-  const [dropOver, setDropOver] = useState(false)
-
-  useEffect(() => {
-    if (!ctxMenu) return
-    function close() { setCtxMenu(null) }
-    window.addEventListener('click', close)
-    window.addEventListener('contextmenu', close)
-    return () => { window.removeEventListener('click', close); window.removeEventListener('contextmenu', close) }
-  }, [ctxMenu])
-  const hoverTimer = useRef(null)
-  const indent = depth * 14
-  const thisKey = selKey({ kind: 'model', modelPath })
-  const isSel = (multiSel || []).some(s => s.kind === 'model' && selKey(s) === thisKey)
-
-  // Auto-open when any selection is inside this node
-  useEffect(() => {
-    const all = multiSel?.length ? multiSel : (sel ? [sel] : [])
-    for (const s of all) {
-      if (!s?.modelPath) continue
-      const sp = s.modelPath
-      const isAnc = sp.length > modelPath.length && modelPath.every((v, i) => sp[i] === v)
-      const isParent = s.kind === 'box' && sp.length === modelPath.length && modelPath.every((v, i) => sp[i] === v)
-      if (isAnc || isParent) { onOpenNode?.(modelPath); break }
-    }
-  }, [sel, multiSel]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  function onDragOverNode(e) {
-    e.preventDefault(); e.stopPropagation(); setDropOver(true)
-    if (!hoverTimer.current) hoverTimer.current = setTimeout(() => onOpenNode?.(modelPath), 600)
-  }
-  function onDragLeaveNode() {
-    setDropOver(false)
-    clearTimeout(hoverTimer.current); hoverTimer.current = null
-  }
-
-  const hasChildren = (model.boxes?.length || 0) + (model.submodels?.length || 0) > 0
-  const isHidden = hiddenModels?.has(modelPath.join('_'))
-  return (
-    <div>
-      <div draggable
-        onDragStart={e => { e.stopPropagation(); onDragStart({ kind: 'model', modelPath }) }}
-        onDragOver={onDragOverNode}
-        onDragLeave={onDragLeaveNode}
-        onDrop={e => { e.stopPropagation(); setDropOver(false); clearTimeout(hoverTimer.current); hoverTimer.current = null; onDrop({ kind: 'model', modelPath }) }}
-        style={{
-          ...s.treeRow, paddingLeft: 4 + indent,
-          background: isSel ? 'var(--clr-accent)' : dropOver ? 'rgba(100,160,255,0.18)' : 'transparent',
-          color: isSel ? '#fff' : 'var(--clr-text)',
-          outline: dropOver ? '1px dashed #4488ff' : 'none', cursor: 'grab'
-        }}
-        onClick={e => onSel({ kind: 'model', modelPath }, e.shiftKey, e.ctrlKey || e.metaKey)}
-        onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onSel({ kind: 'model', modelPath }, false, false); setCtxMenu({ x: e.clientX, y: e.clientY }) }}>
-        <span style={{ fontSize: '9px', width: '10px', color: isSel ? '#fff' : 'var(--clr-text-dim)', flexShrink: 0 }}
-          onClick={e => { e.stopPropagation(); onToggleOpen?.(modelPath) }}>
-          {hasChildren ? (open ? '▼' : '▶') : ' '}
-        </span>
-        <span style={{ color: isSel ? '#fff' : '#88aaff' }}>{(model.submodels?.length && !model.boxes?.length) ? '📁' : '⬡'}</span>
-        <span style={{ flex: 1, opacity: isHidden ? 0.4 : 1 }}
-          onDoubleClick={e => { e.stopPropagation(); setEditVal(model.id || model.part || ''); setEditing(true) }}>
-          {editing
-            ? <input autoFocus value={editVal}
-              style={{ background: 'var(--bg-panel)', color: 'var(--clr-text)', border: '1px solid var(--clr-accent)', borderRadius: 2, width: '90%', fontSize: 'inherit', padding: '0 2px' }}
-              onChange={e => setEditVal(e.target.value)}
-              onBlur={() => { if (editVal.trim() && onRename) onRename(modelPath, editVal.trim()); setEditing(false) }}
-              onKeyDown={e => { if (e.key === 'Enter') { if (editVal.trim() && onRename) onRename(modelPath, editVal.trim()); setEditing(false) } else if (e.key === 'Escape') { setEditing(false) } e.stopPropagation() }}
-              onClick={e => e.stopPropagation()} />
-            : model.id || model.part || `bone ${modelPath[modelPath.length - 1]}`}
-        </span>
-        {onToggleVisible && <span title={isHidden ? 'Show' : 'Hide'}
-          onClick={e => { e.stopPropagation(); onToggleVisible(modelPath) }}
-          style={{ marginLeft: 'auto', fontSize: '11px', opacity: isHidden ? 0.35 : 0.7, cursor: 'pointer', paddingRight: '2px', flexShrink: 0 }}>
-          {isHidden ? '○' : '●'}
-        </span>}
-      </div>
-      {open && <>
-        {(model.boxes || []).map((box, bi) => {
-          const boxSel = { kind: 'box', modelPath, boxIdx: bi }
-          const bSel = (multiSel || []).some(s => s.kind === 'box' && selKey(s) === selKey(boxSel))
-          return (
-            <BoxRow key={bi} box={box} bi={bi} indent={indent} bSel={bSel} modelPath={modelPath}
-              onSel={onSel} onDragStart={onDragStart} onDrop={onDrop} boxSel={boxSel}
-              onRename={onRenameBox} onDelete={onDeleteBox} />
-          )
-        })}
-        {(model.submodels || []).map((sub, si) => (
-          <OutlinerNode key={si} model={sub} modelPath={[...modelPath, si]} sel={sel} multiSel={multiSel} onSel={onSel}
-            onDragStart={onDragStart} onDrop={onDrop} depth={depth + 1}
-            hiddenModels={hiddenModels} onToggleVisible={onToggleVisible} onRename={onRename} onDelete={onDelete}
-            onRenameBox={onRenameBox} onDeleteBox={onDeleteBox}
-            openNodes={openNodes} onToggleOpen={onToggleOpen} onOpenNode={onOpenNode} />
-        ))}
-      </>}
-      {ctxMenu && <div
-        style={{
-          position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 9999,
-          background: 'var(--bg-panel)', border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: 4, padding: '2px 0', boxShadow: '2px 4px 16px rgba(0,0,0,0.5)', minWidth: 160
-        }}
-        onClick={e => e.stopPropagation()}>
-        <div style={{ padding: '5px 14px', cursor: 'pointer', fontSize: '12px' }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--clr-accent)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-          onClick={() => { setCtxMenu(null); setEditVal(model.id || model.part || ''); setEditing(true) }}>
-          Rename
-        </div>
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.1)', margin: '2px 0' }} />
-        <div style={{ padding: '5px 14px', cursor: 'pointer', fontSize: '12px', color: '#f77' }}
-          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,80,80,0.15)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-          onClick={() => { setCtxMenu(null); onDelete && onDelete(modelPath) }}>
-          Delete
-        </div>
-      </div>}
-    </div>
-  )
-}
-
-function RootDropZone({ onDrop }) {
-  const [over, setOver] = useState(false)
-  return (
-    <div
-      onDragOver={e => { e.preventDefault(); setOver(true) }}
-      onDragLeave={() => setOver(false)}
-      onDrop={e => { e.stopPropagation(); setOver(false); onDrop() }}
-      style={{
-        minHeight: 24, borderTop: '1px dashed rgba(255,255,255,0.08)', margin: '2px 4px', borderRadius: 2,
-        background: over ? 'rgba(100,160,255,0.12)' : 'transparent',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '9px', color: over ? '#88aaff' : 'rgba(255,255,255,0.2)', fontFamily: 'Monocraft,sans-serif',
-        transition: 'background 0.1s'
-      }}>
-      {over ? '↑ move to root' : ''}
-    </div>
-  )
-}
-
-function BoxRow({ box, bi, indent, bSel, modelPath, onSel, onDragStart, onDrop, boxSel, onRename, onDelete }) {
-  const [dropOver, setDropOver] = useState(false)
-  const [ctxMenu, setCtxMenu] = useState(null)
-  const [editing, setEditing] = useState(false)
-  const [editVal, setEditVal] = useState('')
-
-  useEffect(() => {
-    if (!ctxMenu) return
-    function close() { setCtxMenu(null) }
-    window.addEventListener('click', close)
-    window.addEventListener('contextmenu', close)
-    return () => { window.removeEventListener('click', close); window.removeEventListener('contextmenu', close) }
-  }, [ctxMenu])
-
-  const displayName = box.name || `cube ${bi}`
-
-  return (
-    <div>
-      <div draggable
-        onDragStart={e => { e.stopPropagation(); onDragStart({ kind: 'box', modelPath, boxIdx: bi }) }}
-        onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDropOver(true) }}
-        onDragLeave={() => setDropOver(false)}
-        onDrop={e => { e.stopPropagation(); setDropOver(false); onDrop({ kind: 'box', modelPath, boxIdx: bi }) }}
-        style={{
-          ...s.treeRow, paddingLeft: 4 + indent + 18,
-          background: bSel ? 'var(--clr-accent)' : dropOver ? 'rgba(100,160,255,0.18)' : 'transparent',
-          color: bSel ? '#fff' : 'var(--clr-text)',
-          outline: dropOver ? '1px dashed #4488ff' : 'none', cursor: 'grab'
-        }}
-        onClick={e => onSel(boxSel, e.shiftKey, e.ctrlKey || e.metaKey)}
-        onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onSel(boxSel, false, false); setCtxMenu({ x: e.clientX, y: e.clientY }) }}>
-        <span style={{ color: bSel ? '#fff' : '#ffaa55' }}>□</span>
-        {editing
-          ? <input autoFocus value={editVal}
-            style={{ background: 'var(--bg-panel)', color: 'var(--clr-text)', border: '1px solid var(--clr-accent)', borderRadius: 2, width: '80%', fontSize: 'inherit', padding: '0 2px' }}
-            onChange={e => setEditVal(e.target.value)}
-            onBlur={() => { if (editVal.trim() && onRename) onRename(modelPath, bi, editVal.trim()); setEditing(false) }}
-            onKeyDown={e => { if (e.key === 'Enter') { if (editVal.trim() && onRename) onRename(modelPath, bi, editVal.trim()); setEditing(false) } else if (e.key === 'Escape') setEditing(false); e.stopPropagation() }}
-            onClick={e => e.stopPropagation()} />
-          : <span onDoubleClick={e => { e.stopPropagation(); setEditVal(box.name || ''); setEditing(true) }}>{displayName}</span>}
-        {box.coordinates && <span style={{ color: 'rgba(160,160,160,0.5)', fontSize: '10px', marginLeft: 4 }}>
-          {box.coordinates.slice(0, 3).map(v => Math.round(v)).join(',')}
-        </span>}
-      </div>
-      {ctxMenu && <div
-        style={{
-          position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 9999,
-          background: 'var(--bg-panel)', border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: 4, padding: '2px 0', boxShadow: '2px 4px 16px rgba(0,0,0,0.5)', minWidth: 160
-        }}
-        onClick={e => e.stopPropagation()}>
-        <div style={{ padding: '5px 14px', cursor: 'pointer', fontSize: '12px' }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--clr-accent)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-          onClick={() => { setCtxMenu(null); setEditVal(box.name || ''); setEditing(true) }}>
-          Rename
-        </div>
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.1)', margin: '2px 0' }} />
-        <div style={{ padding: '5px 14px', cursor: 'pointer', fontSize: '12px', color: '#f77' }}
-          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,80,80,0.15)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-          onClick={() => { setCtxMenu(null); onDelete && onDelete(modelPath, bi) }}>
-          Delete
-        </div>
-      </div>}
-    </div>
-  )
-}
-
-// ── Vec3 input ────────────────────────────────────────────────────────────────
-
-function Vec3Input({ label, value = [0, 0, 0], step = 0.5, onChange }) {
-  return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ ...s.label, marginBottom: 2 }}>{label}</div>
-      <div style={{ display: 'flex', gap: 3, width: '100%' }}>
-        {['X', 'Y', 'Z'].map((ax, i) => (
-          <div key={ax} style={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, minWidth: 0 }}>
-            <span style={s.propLabel}>{ax}</span>
-            <input type="number" step={step} style={{ ...s.numInput, width: 0 }}
-              value={Math.round((value[i] ?? 0) * 1000) / 1000}
-              onChange={e => { const n = [...value]; n[i] = Number(e.target.value); onChange(n) }} />
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const ModelerBase = forwardRef(function Modeler({
@@ -354,7 +81,7 @@ const ModelerBase = forwardRef(function Modeler({
   sharedViewerRef,
   uvZoom,
   onUvChange,
-  ...props
+  onBack,
 }, ref) {
   // 1. Grab EVERYTHING from context
   const {
@@ -372,6 +99,9 @@ const ModelerBase = forwardRef(function Modeler({
     undoCount,
     redoCount,
   } = useModeler();
+
+  const patchSelModel = (updater) => { if (sel?.modelPath) patchModel(sel.modelPath, updater) }
+  const patchSelBox = (updater) => { if (sel?.modelPath != null && sel?.boxIdx != null) patchBox(sel.modelPath, sel.boxIdx, updater) }
 
   const [searchParams] = useSearchParams()
   const { isDark } = useTheme()
@@ -1621,59 +1351,31 @@ const ModelerBase = forwardRef(function Modeler({
 
       {/* Toolbar — hidden when embedded (tools live in Studio's center top bar) */}
       {!embedded && (
-        <div style={s.topBar}>
-          {onBack && <div style={s.divider} />}
-          <button style={editMode === 'body' ? s.btnAct : s.btnSm} onClick={() => setEditMode('body')}>Body</button>
-          <button style={editMode === 'part' ? s.btnAct : s.btnSm} onClick={() => setEditMode('part')}>Part</button>
-          {editMode === 'body'
-            ? <select style={{ ...s.select, width: 'auto' }} value={bodyId ?? ''} onChange={e => setBodyId(Number(e.target.value))}>
-              {bodies.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-            : <select style={{ ...s.select, width: 'auto' }} value={partId ?? ''} onChange={e => setPartId(Number(e.target.value))}>
-              {parts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          }
-          {editMode === 'part' && bodyId && <>
-            <div style={s.divider} />
-            <button style={showBody ? s.btnAct : s.btnSm} onClick={() => setShowBody(v => !v)} title="Toggle body preview">◉ Body</button>
-          </>}
-          <div style={s.divider} />
-          <button style={tcMode === 'translate' ? s.btnAct : s.btnSm} onClick={() => setTcMode('translate')} title="Move (W)">⤢ Move</button>
-          <button style={tcMode === 'rotate' ? s.btnAct : s.btnSm} onClick={() => setTcMode('rotate')} title="Rotate (E)">↻ Rotate</button>
-          <button style={tcMode === 'pivot' ? s.btnAct : s.btnSm} onClick={() => setTcMode('pivot')} title="Move pivot (keeps geometry in place)">⊙ Pivot</button>
-          <div style={s.divider} />
-          <button style={showGrid ? s.btnAct : s.btnSm} onClick={() => setShowGrid(v => !v)}>⊞ Grid</button>
-          <div style={s.divider} />
-          <button style={s.btnSm} onClick={addCube}>+ Cube</button>
-          <button style={{ ...s.btnSm, opacity: sel ? 1 : 0.4 }} onClick={deleteSelected} disabled={!sel} title="Delete (Del)">✕ Delete</button>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px', alignItems: 'center' }}>
-            {status === 'ok' && <span style={s.ok}>Saved!</span>}
-            {status && status !== 'ok' && <span style={s.err}>{status}</span>}
-            <button style={{ ...s.btnSm, opacity: isDirty ? 1 : 0.4 }} onClick={revert} disabled={!isDirty}>Revert</button>
-            <button style={s.btn} onClick={save}>Save</button>
-          </div>
-        </div>
+        <TopBar
+          editMode={editMode} setEditMode={setEditMode}
+          bodies={bodies} bodyId={bodyId} setBodyId={setBodyId}
+          parts={parts} partId={partId} setPartId={setPartId}
+          showBody={showBody} setShowBody={setShowBody}
+          tcMode={tcMode} setTcMode={setTcMode}
+          showGrid={showGrid} setShowGrid={setShowGrid}
+          sel={sel} status={status} isDirty={isDirty}
+          addCube={addCube} deleteSelected={deleteSelected}
+          save={save} revert={revert} onBack={onBack}
+        />
       )}
 
       <div style={s.content}>
 
         {/* Left — Outliner */}
-        <div style={s.outliner}>
-          <div style={{ ...XP_TITLE, display: 'flex', alignItems: 'center' }}>
-            <span style={{ flex: 1 }}>Outliner</span>
-            <button title="Add Folder" onClick={addFolder}
-              style={{ background: 'none', border: 'none', color: 'var(--clr-text)', cursor: 'pointer', fontSize: '13px', padding: '0 4px', lineHeight: 1 }}>📁+</button>
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ flex: 1 }}>
-              {(data?.models || []).map((model, mi) => (
-                <OutlinerNode key={mi} model={model} modelPath={[mi]} sel={sel} multiSel={multiSel} onSel={selectAndAttach} onDragStart={handleDragStart} onDrop={handleDrop} depth={0} hiddenModels={hiddenModels} onToggleVisible={toggleModelVisible} onRename={handleRename} onDelete={deleteModel} onRenameBox={handleRenameBox} onDeleteBox={handleDeleteBox} openNodes={openNodes} onToggleOpen={toggleOpen} onOpenNode={openNode} />
-              ))}
-            </div>
-            {/* Root drop zone — drag here to move a model back to top level */}
-            <RootDropZone onDrop={handleDropRoot} />
-          </div>
-        </div>
+        <OutlinerPanel
+          models={data?.models} sel={sel} multiSel={multiSel}
+          onSel={selectAndAttach} onDragStart={handleDragStart} onDrop={handleDrop} onDropRoot={handleDropRoot}
+          hiddenModels={hiddenModels} onToggleVisible={toggleModelVisible}
+          onRename={handleRename} onDelete={deleteModel}
+          onRenameBox={handleRenameBox} onDeleteBox={handleDeleteBox}
+          openNodes={openNodes} onToggleOpen={toggleOpen} onOpenNode={openNode}
+          onAddFolder={addFolder}
+        />
 
         {/* Center — 3D Viewport (hidden in shared mode; CemViewer is the canvas) */}
         {!sharedViewerRef && <div ref={mountRef} style={s.viewport} onClick={onViewportClick} />}
@@ -1708,23 +1410,11 @@ const ModelerBase = forwardRef(function Modeler({
           )}
 
           {/* ── UV / Texture canvas ── */}
-          <div style={{ flexShrink: 0, borderBottom: '2px solid var(--bdr-dk)', background: '#111', lineHeight: 0, position: 'relative', overflow: 'auto', maxHeight: 220 }}>
-            <canvas ref={uvCanvasRef}
-              style={{ display: 'block', imageRendering: 'pixelated', cursor: uvCursor }}
-              onMouseDown={onUVMouseDown}
-              onMouseMove={onUVMouseMove}
-              onMouseUp={onUVCommit}
-              onMouseLeave={onUVCommit}
-            />
-            {!uvBufRef.current && (
-              <div style={{
-                position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'rgba(255,255,255,0.2)', fontSize: '10px', fontFamily: 'Monocraft,sans-serif', pointerEvents: 'none'
-              }}>
-                no texture
-              </div>
-            )}
-          </div>
+          <UVEditor
+            uvCanvasRef={uvCanvasRef} uvCursor={uvCursor} uvBufRef={uvBufRef}
+            onMouseDown={onUVMouseDown} onMouseMove={onUVMouseMove}
+            onMouseUp={onUVCommit} onMouseLeave={onUVCommit}
+          />
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '8px', minHeight: 0 }}>
 
@@ -1743,9 +1433,9 @@ const ModelerBase = forwardRef(function Modeler({
                   Bone: {selModel.id || selModel.part}
                 </div>
                 <Vec3Input label="Translate" value={selModel.translate || [0, 0, 0]}
-                  onChange={v => patchModel(n => ({ ...n, translate: v }))} />
+                  onChange={v => patchSelModel(n => ({ ...n, translate: v }))} />
                 <Vec3Input label="Rotate (°)" value={selModel.rotate || [0, 0, 0]}
-                  onChange={v => patchModel(n => ({ ...n, rotate: v }))} />
+                  onChange={v => patchSelModel(n => ({ ...n, rotate: v }))} />
                 <button style={{ ...s.btnSm, marginTop: 4 }} onClick={autoPackUVs}
                   title="Re-pack all UV offsets in this folder with no overlap">
                   ⬡ Auto-Pack UVs
@@ -1759,9 +1449,9 @@ const ModelerBase = forwardRef(function Modeler({
                   Cube {sel.boxIdx}
                 </div>
                 <Vec3Input label="Position" value={selBox.coordinates?.slice(0, 3) || [0, 0, 0]}
-                  onChange={v => patchBox(b => ({ ...b, coordinates: [...v, ...(b.coordinates?.slice(3) || [1, 1, 1])] }))} />
+                  onChange={v => patchSelBox(b => ({ ...b, coordinates: [...v, ...(b.coordinates?.slice(3) || [1, 1, 1])] }))} />
                 <Vec3Input label="Size" value={selBox.coordinates?.slice(3, 6) || [1, 1, 1]} step={1}
-                  onChange={v => patchBox(b => ({ ...b, coordinates: [...(b.coordinates?.slice(0, 3) || [0, 0, 0]), ...v] }))} />
+                  onChange={v => patchSelBox(b => ({ ...b, coordinates: [...(b.coordinates?.slice(0, 3) || [0, 0, 0]), ...v] }))} />
                 <button style={{ ...s.btnSm, marginBottom: 8 }} onClick={autoPackUVs}
                   title="Re-pack UV offsets for all cubes in the parent folder">
                   ⬡ Auto-Pack UVs
@@ -1797,7 +1487,7 @@ const ModelerBase = forwardRef(function Modeler({
                             value={selBox.textureOffset?.[i] ?? 0}
                             onChange={e => {
                               const t = [...(selBox.textureOffset || [0, 0])]; t[i] = Number(e.target.value)
-                              patchBox(b => ({ ...b, textureOffset: t }))
+                              patchSelBox(b => ({ ...b, textureOffset: t }))
                             }} />
                         </div>
                       ))}
@@ -1816,7 +1506,7 @@ const ModelerBase = forwardRef(function Modeler({
                             <input type="number" style={s.numInput} value={coords[ci]}
                               onChange={e => {
                                 const n = [...coords]; n[ci] = Number(e.target.value)
-                                patchBox(b => ({ ...b, [key]: n }))
+                                patchSelBox(b => ({ ...b, [key]: n }))
                               }} />
                           </div>
                         ))}
@@ -1831,7 +1521,7 @@ const ModelerBase = forwardRef(function Modeler({
                   <div style={{ ...s.label, marginBottom: 2 }}>Inflate</div>
                   <input type="number" step={0.5} style={s.numInput}
                     value={selBox.inflate ?? 0}
-                    onChange={e => patchBox(b => ({ ...b, inflate: Number(e.target.value) }))} />
+                    onChange={e => patchSelBox(b => ({ ...b, inflate: Number(e.target.value) }))} />
                 </div>
               </>
             )}

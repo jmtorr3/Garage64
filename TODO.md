@@ -8,20 +8,20 @@ TODO:
 
 ### Phase 2: State Decoupling
 - [x] Create `context/ModelerContext.jsx`.
-- [ ] Migrate all core `useRef` data stores (`dataRef`, `origRef`, `undoStackRef`, `redoStackRef`) into the Provider.
-- [ ] Migrate core mutator functions (`pushUndo`, `patchModel`, `syncTCToData`) into the Provider.
-- [ ] Wrap the main `Modeler` component in the `<ModelerProvider>`.
+- [x] Migrate all core `useRef` data stores (`dataRef`, `origRef`, `undoStackRef`, `redoStackRef`) into the Provider.
+- [x] Migrate core mutator functions (`pushUndo`, `patchModel`, `patchBox`, `bump`) into the Provider. (`syncTCToData` stays in component — depends on Three.js refs)
+- [x] Wrap the main `Modeler` component in the `<ModelerProvider>`.
 
 ### Phase 3: UI Component Isolation
-- [ ] Create `components/Outliner/` and extract `<OutlinerPanel>`, `<OutlinerNode>`, `<BoxRow>`, and `<RootDropZone>`.
-- [ ] Create `components/Viewport/` and extract the Three.js canvas and `TransformControls` initialization into `<Viewport3D>`.
-- [ ] Create `components/Properties/` and extract the right-hand panel, including `<Vec3Input>`.
-- [ ] Extract the custom 2D canvas logic into `components/Properties/UVEditor.jsx`.
-- [ ] Extract the top toolbar into `components/TopBar.jsx`.
+- [x] Create `components/Outliner/` and extract `<OutlinerPanel>`, `<OutlinerNode>`, `<BoxRow>`, and `<RootDropZone>`.
+- [ ] Create `components/Viewport/` and extract the Three.js canvas and `TransformControls` initialization into `<Viewport3D>`. (deferred — tightly coupled to component lifecycle)
+- [x] Create `components/Properties/` and extract the right-hand panel, including `<Vec3Input>`.
+- [x] Extract the custom 2D canvas logic into `components/Properties/UVEditor.jsx`.
+- [x] Extract the top toolbar into `components/TopBar.jsx`.
 
 ### Phase 4: Final Cleanup
-- [ ] Strip the original `Modeler.jsx` down to a pure layout orchestrator.
-- [ ] Clean up unused imports and verify no unnecessary re-renders are being triggered by the new context.
+- [x] Strip the original `index.jsx` down to a layout orchestrator (1877 → 1567 lines).
+- [x] Clean up unused imports and verify no unnecessary re-renders are being triggered by the new context.
 
 
 ### EntityBody
