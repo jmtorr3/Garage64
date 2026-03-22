@@ -55,6 +55,8 @@ export const ModelerProvider = ({ children }) => {
   const value = {
     dataRef,
     origRef,
+    undoStackRef,
+    redoStackRef,
     dataVer,
     setDataVer,
     sel,
@@ -64,7 +66,7 @@ export const ModelerProvider = ({ children }) => {
     pushUndo,
     bump,
     patchModel,
-    patchBox, // Don't forget to export this!
+    patchBox,
     undoCount: undoStackRef.current.length,
     redoCount: redoStackRef.current.length
   };

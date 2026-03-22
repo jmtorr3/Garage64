@@ -4,6 +4,7 @@
  */
 
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, forwardRef } from 'react'
+import { ModelerProvider, useModeler } from './context/ModelerContext'
 import { useSearchParams } from 'react-router-dom'
 import { useTheme } from '../../ThemeContext'
 import * as THREE from 'three'
@@ -343,18 +344,33 @@ function Vec3Input({ label, value = [0, 0, 0], step = 0.5, onChange }) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const ModelerBase = forwardRef(function Modeler({
-  partId: initPartId, bodyId: initBodyId, /* ... other props */
+  partId: initPartId,
+  bodyId: initBodyId,
+  showGridProp,
+  embedded = false,
+  newPart,
+  onBarUpdate,
+  texturePatch,
+  sharedViewerRef,
+  uvZoom,
+  onUvChange,
+  ...props
 }, ref) {
   // 1. Grab EVERYTHING from context
   const {
     dataRef,
+    origRef,
+    undoStackRef,
+    redoStackRef,
     sel, setSel,
     dataVer, setDataVer,
-    isDirty, setIsDirty, // Rename 'dirty' to 'isDirty' to match context
+    isDirty, setIsDirty,
     pushUndo,
     bump,
     patchModel,
-    patchBox, // You should add this to your context too!
+    patchBox,
+    undoCount,
+    redoCount,
   } = useModeler();
 
   const [searchParams] = useSearchParams()
@@ -379,6 +395,10 @@ const ModelerBase = forwardRef(function Modeler({
   const rPanelDragRef = useRef(null)
 
   const dragItemRef = useRef(null)
+  const selRef = useRef(null)
+  const multiSelRef = useRef([])
+  const modelerUndoRef = useRef(null)
+  const modelerRedoRef = useRef(null)
 
   // Model data lives in a ref so TC sync doesn't trigger rebuilds
   const tcModeRef = useRef('translate')
@@ -444,7 +464,7 @@ const ModelerBase = forwardRef(function Modeler({
       dataRef.current = { models: [] }
       texMapRef.current = {}
       undoStackRef.current = []; redoStackRef.current = []
-      setDataVer(v => v + 1); setDirty(false); setSel(null)
+      setDataVer(v => v + 1); setIsDirty(false); setSel(null)
       removeBodyPreview()
       if (ctxRef.current) {
         const ctx = ctxRef.current
@@ -470,7 +490,7 @@ const ModelerBase = forwardRef(function Modeler({
       dataRef.current = b.body_data; origRef.current = b.body_data
       undoStackRef.current = []; redoStackRef.current = []
       if (ctxRef.current && !embedded) ctxRef.current.firstLoad = true
-      setDataVer(v => v + 1); setDirty(false); setSel(null); setStatus('')
+      setDataVer(v => v + 1); setIsDirty(false); setSel(null); setStatus('')
       loadTexAndRebuild(b.body_data)
     })
     return () => { cancelled = true }
@@ -485,7 +505,7 @@ const ModelerBase = forwardRef(function Modeler({
       dataRef.current = jem; origRef.current = jem
       undoStackRef.current = []; redoStackRef.current = []
       if (ctxRef.current && !embedded) ctxRef.current.firstLoad = true
-      setDataVer(v => v + 1); setDirty(false); setSel(null); setStatus('')
+      setDataVer(v => v + 1); setIsDirty(false); setSel(null); setStatus('')
       loadTexAndRebuild(jem)
     })
   }, [partId, editMode])  // eslint-disable-line react-hooks/exhaustive-deps
@@ -831,7 +851,7 @@ const ModelerBase = forwardRef(function Modeler({
     pushUndo()
     tcSyncRef.current = true
     dataRef.current = { ...data, models: newModels }
-    setDataVer(v => v + 1); setDirty(true)
+    setDataVer(v => v + 1); setIsDirty(true)
     setTimeout(() => { tcSyncRef.current = false }, 0)
   }
 
@@ -1129,7 +1149,7 @@ const ModelerBase = forwardRef(function Modeler({
     if (undoStackRef.current.length > 100) undoStackRef.current.shift()
     redoStackRef.current = []
     setDataVer(v => v + 1)
-    setDirty(true)
+    setIsDirty(true)
     notifyBar()
   }
 
@@ -1199,7 +1219,7 @@ const ModelerBase = forwardRef(function Modeler({
     }
     dataRef.current = { ...dataRef.current, models: newModels }
     setDataVer(v => v + 1)
-    setDirty(true)
+    setIsDirty(true)
     notifyBar()
   }
 
@@ -1256,7 +1276,7 @@ const ModelerBase = forwardRef(function Modeler({
     if (!undoStackRef.current.length) return
     redoStackRef.current.push(JSON.stringify(dataRef.current))
     dataRef.current = JSON.parse(undoStackRef.current.pop())
-    setDataVer(v => v + 1); setDirty(true)
+    setDataVer(v => v + 1); setIsDirty(true)
     rebuildScene(); notifyBar()
   }
 
@@ -1264,7 +1284,7 @@ const ModelerBase = forwardRef(function Modeler({
     if (!redoStackRef.current.length) return
     undoStackRef.current.push(JSON.stringify(dataRef.current))
     dataRef.current = JSON.parse(redoStackRef.current.pop())
-    setDataVer(v => v + 1); setDirty(true)
+    setDataVer(v => v + 1); setIsDirty(true)
     rebuildScene(); notifyBar()
   }
 
@@ -1295,7 +1315,7 @@ const ModelerBase = forwardRef(function Modeler({
       parent.submodels.splice(path[path.length - 1], 1)
     }
     dataRef.current = { ...dataRef.current, models: clone }
-    setDataVer(v => v + 1); setDirty(true)
+    setDataVer(v => v + 1); setIsDirty(true)
     clearSel()
   }
 
@@ -1349,7 +1369,7 @@ const ModelerBase = forwardRef(function Modeler({
       } else {
         await api.patchBody(bodyId, { body_data: dataRef.current })
       }
-      origRef.current = dataRef.current; setDirty(false); setStatus('ok')
+      origRef.current = dataRef.current; setIsDirty(false); setStatus('ok')
     } catch (e) { setStatus(e.message) }
   }
 
@@ -1363,7 +1383,7 @@ const ModelerBase = forwardRef(function Modeler({
       const newPath = p.jpm_path.replace(/[^/]+\.jpm$/, `${newName.trim()}.jpm`)
       const created = await api.createPart({ ...p, id: undefined, name: newName.trim(), jpm_path: newPath, part_data: partData })
       partObjRef.current = created
-      origRef.current = dataRef.current; setDirty(false); setStatus('ok'); return true
+      origRef.current = dataRef.current; setIsDirty(false); setStatus('ok'); return true
     } catch (e) { setStatus(e.message) }
   }
 
@@ -1463,7 +1483,7 @@ const ModelerBase = forwardRef(function Modeler({
       undoStackRef.current.push(origData)
       if (undoStackRef.current.length > 100) undoStackRef.current.shift()
       redoStackRef.current = []
-      setDataVer(v => v + 1); setDirty(true); notifyBar()
+      setDataVer(v => v + 1); setIsDirty(true); notifyBar()
     },
   }), []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1480,7 +1500,7 @@ const ModelerBase = forwardRef(function Modeler({
 
   function revert() {
     dataRef.current = origRef.current
-    setDataVer(v => v + 1); setDirty(false); clearSel(); setStatus('')
+    setDataVer(v => v + 1); setIsDirty(false); clearSel(); setStatus('')
   }
 
   function handleDragStart(item) {
@@ -1525,7 +1545,7 @@ const ModelerBase = forwardRef(function Modeler({
         return { ...n, boxes }
       })
       dataRef.current = { ...data, models }
-      setDataVer(v => v + 1); setDirty(true); clearSel()
+      setDataVer(v => v + 1); setIsDirty(true); clearSel()
       return
     }
 
@@ -1564,7 +1584,7 @@ const ModelerBase = forwardRef(function Modeler({
         const adjTp = adjustPath(sp, tp)
         dataRef.current = { ...data, models: nestModel(m1, adjTp, node) }
       }
-      setDataVer(v => v + 1); setDirty(true)
+      setDataVer(v => v + 1); setIsDirty(true)
     }
   }
 
@@ -1577,7 +1597,7 @@ const ModelerBase = forwardRef(function Modeler({
     pushUndo()
     const [newModels, node] = extractModel(data.models, src.modelPath)
     dataRef.current = { ...data, models: [...newModels, node] }
-    setDataVer(v => v + 1); setDirty(true)
+    setDataVer(v => v + 1); setIsDirty(true)
   }
 
   function addFolder() {
@@ -1587,7 +1607,7 @@ const ModelerBase = forwardRef(function Modeler({
     const name = `folder_${existing.length + 1}`
     const newFolder = { id: name, boxes: [], submodels: [] }
     dataRef.current = { ...dataRef.current, models: [...(dataRef.current.models || []), newFolder] }
-    setDataVer(v => v + 1); setDirty(true)
+    setDataVer(v => v + 1); setIsDirty(true)
   }
 
   // ── Derived for render ─────────────────────────────────────────────────────
@@ -1629,7 +1649,7 @@ const ModelerBase = forwardRef(function Modeler({
           <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px', alignItems: 'center' }}>
             {status === 'ok' && <span style={s.ok}>Saved!</span>}
             {status && status !== 'ok' && <span style={s.err}>{status}</span>}
-            <button style={{ ...s.btnSm, opacity: dirty ? 1 : 0.4 }} onClick={revert} disabled={!dirty}>Revert</button>
+            <button style={{ ...s.btnSm, opacity: isDirty ? 1 : 0.4 }} onClick={revert} disabled={!isDirty}>Revert</button>
             <button style={s.btn} onClick={save}>Save</button>
           </div>
         </div>
@@ -1678,7 +1698,7 @@ const ModelerBase = forwardRef(function Modeler({
                     const next = i === 0 ? [v, cur[1]] : [cur[0], v]
                     pushUndo()
                     dataRef.current = { ...dataRef.current, textureSize: next }
-                    setDataVer(v => v + 1); setDirty(true)
+                    setDataVer(v => v + 1); setIsDirty(true)
                     redrawUVRef.current?.()
                   }}
                 />
@@ -1847,8 +1867,6 @@ const ModelerBase = forwardRef(function Modeler({
     </div>
   )
 })
-
-import { ModelerProvider, useModeler } from './context/ModelerContext';
 
 const Modeler = forwardRef((props, ref) => (
   <ModelerProvider>
