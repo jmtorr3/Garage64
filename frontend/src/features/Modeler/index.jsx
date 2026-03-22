@@ -342,7 +342,21 @@ function Vec3Input({ label, value = [0, 0, 0], step = 0.5, onChange }) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBodyId, onBack, embedded = false, sharedViewerRef = null, texturePatch = null, onBarUpdate = null, showGridProp = null, newPart = false, uvZoom = null, onUvChange = null } = {}, ref) {
+const ModelerBase = forwardRef(function Modeler({
+  partId: initPartId, bodyId: initBodyId, /* ... other props */
+}, ref) {
+  // 1. Grab EVERYTHING from context
+  const {
+    dataRef,
+    sel, setSel,
+    dataVer, setDataVer,
+    isDirty, setIsDirty, // Rename 'dirty' to 'isDirty' to match context
+    pushUndo,
+    bump,
+    patchModel,
+    patchBox, // You should add this to your context too!
+  } = useModeler();
+
   const [searchParams] = useSearchParams()
   const { isDark } = useTheme()
   const bg = isDark ? '#1e1e1e' : '#ece9d8'
@@ -352,12 +366,9 @@ const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBo
   const [parts, setParts] = useState([])
   const [partId, setPartId] = useState(null)
   const partObjRef = useRef(null) // full part object for save
-  const [sel, setSel] = useState(null)
   const [multiSel, setMultiSel] = useState([]) // all selected items (including primary)
   const [tcMode, setTcMode] = useState('translate')
-  const [dirty, setDirty] = useState(false)
   const [status, setStatus] = useState('')
-  const [dataVer, setDataVer] = useState(0) // bumped to force re-render from ref
   const [showGrid, setShowGrid] = useState(false)
   const [hiddenModels, setHiddenModels] = useState(new Set())
   const [openNodes, setOpenNodes] = useState(new Set()) // set of modelPath keys that are expanded
@@ -370,15 +381,7 @@ const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBo
   const dragItemRef = useRef(null)
 
   // Model data lives in a ref so TC sync doesn't trigger rebuilds
-  const dataRef = useRef(null)
-  const origRef = useRef(null)
-  const selRef = useRef(null)
-  const multiSelRef = useRef([])
   const tcModeRef = useRef('translate')
-  const undoStackRef = useRef([])
-  const redoStackRef = useRef([])
-  const modelerUndoRef = useRef(null)
-  const modelerRedoRef = useRef(null)
   useEffect(() => { selRef.current = sel }, [sel])
   useEffect(() => { multiSelRef.current = multiSel }, [multiSel])
   useEffect(() => { tcModeRef.current = tcMode }, [tcMode])
@@ -387,7 +390,7 @@ const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBo
   useEffect(() => { if (showGridProp !== null) setShowGrid(showGridProp) }, [showGridProp])
   useEffect(() => { hiddenModelsRef.current = hiddenModels }, [hiddenModels])
   useEffect(() => {
-    onBarUpdate?.({ tcMode, showGrid, hasSel: !!sel, undoCount: undoStackRef.current.length, redoCount: redoStackRef.current.length })
+    onBarUpdate?.({ tcMode, showGrid, hasSel: !!sel, undoCount, redoCount })
   }, [tcMode, showGrid, sel]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Three.js
@@ -1245,13 +1248,6 @@ const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBo
 
   // ── Data mutations ─────────────────────────────────────────────────────────
 
-  function pushUndo() {
-    if (!dataRef.current) return
-    undoStackRef.current.push(JSON.stringify(dataRef.current))
-    if (undoStackRef.current.length > 100) undoStackRef.current.shift()
-    redoStackRef.current = []
-  }
-
   function notifyBar() {
     onBarUpdate?.({ tcMode: tcModeRef.current, showGrid: ctxRef.current?.grid?.visible ?? false, hasSel: !!selRef.current, undoCount: undoStackRef.current.length, redoCount: redoStackRef.current.length })
   }
@@ -1274,24 +1270,6 @@ const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBo
 
   modelerUndoRef.current = modelerUndo
   modelerRedoRef.current = modelerRedo
-
-  function bump(newModels) {
-    pushUndo()
-    dataRef.current = { ...dataRef.current, models: newModels }
-    setDataVer(v => v + 1); setDirty(true)
-  }
-
-  function patchModel(updater) {
-    if (!sel || sel.kind !== 'model' || !dataRef.current) return
-    bump(updateNode(dataRef.current.models, sel.modelPath, updater))
-  }
-
-  function patchBox(updater) {
-    if (!sel || sel.kind !== 'box' || !dataRef.current) return
-    bump(updateNode(dataRef.current.models, sel.modelPath, n => {
-      const boxes = [...(n.boxes || [])]; boxes[sel.boxIdx] = updater(boxes[sel.boxIdx]); return { ...n, boxes }
-    }))
-  }
 
   function addCube() {
     if (!dataRef.current) return
@@ -1870,4 +1848,12 @@ const Modeler = forwardRef(function Modeler({ partId: initPartId, bodyId: initBo
   )
 })
 
-export default Modeler
+import { ModelerProvider, useModeler } from './context/ModelerContext';
+
+const Modeler = forwardRef((props, ref) => (
+  <ModelerProvider>
+    <ModelerBase {...props} ref={ref} />
+  </ModelerProvider>
+));
+
+export default Modeler;

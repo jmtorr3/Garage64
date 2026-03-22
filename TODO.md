@@ -1,13 +1,13 @@
 TODO:
 ### Phase 1: Pure Logic & Math Extraction
 - [x] Create `utils/` directory.
-- [ ] Extract Three.js specific helpers (`buildSceneRoot`, `annotateGroup`, `disposeGroup`) to `utils/threeHelpers.js`.
-- [ ] Extract CEM data tree mutators (`getNode`, `updateNode`, `extractModel`, `nestModel`) to `utils/cemData.js`.
-- [ ] Extract UV math and packing logic (`textureOffsetRects`, `getFaceRects`, `autoPackUVs`) to `utils/uvMath.js`.
-- [ ] Verify 3D viewport and UV canvas still function perfectly using the imported utilities.
+- [x] Extract Three.js specific helpers (`buildSceneRoot`, `annotateGroup`, `disposeGroup`) to `utils/threeHelpers.js`.
+- [x] Extract CEM data tree mutators (`getNode`, `updateNode`, `extractModel`, `nestModel`) to `utils/cemData.js`.
+- [x] Extract UV math and packing logic (`textureOffsetRects`, `getFaceRects`, `autoPackUVs`) to `utils/uvMath.js`.
+- [x] Verify 3D viewport and UV canvas still function perfectly using the imported utilities.
 
 ### Phase 2: State Decoupling
-- [ ] Create `context/ModelerContext.jsx`.
+- [x] Create `context/ModelerContext.jsx`.
 - [ ] Migrate all core `useRef` data stores (`dataRef`, `origRef`, `undoStackRef`, `redoStackRef`) into the Provider.
 - [ ] Migrate core mutator functions (`pushUndo`, `patchModel`, `syncTCToData`) into the Provider.
 - [ ] Wrap the main `Modeler` component in the `<ModelerProvider>`.
