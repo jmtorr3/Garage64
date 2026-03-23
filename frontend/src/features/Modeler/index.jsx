@@ -148,7 +148,7 @@ const ModelerBase = forwardRef(function Modeler({
   const ctxRef = useRef(null)
   const texMapRef = useRef({})
   const helperRef = useRef(null) // BoxHelper for selection
-  const tcSyncRef = useRef(false)
+  // tcSyncRef removed — scene always rebuilds after TC mouseUp to reset mesh scale/pos state
   const [selFace, setSelFace] = useState(null)
   const [showBody, setShowBody] = useState(false)
   const uvCanvasRef = useRef(null)
@@ -219,7 +219,7 @@ const ModelerBase = forwardRef(function Modeler({
       if (cancelled) return
       dataRef.current = b.body_data; origRef.current = b.body_data
       undoStackRef.current = []; redoStackRef.current = []
-      if (ctxRef.current && !embedded) ctxRef.current.firstLoad = true
+      if (ctxRef.current && !embedded) { ctxRef.current.firstLoad = true; ctxRef.current.sceneOffset = null }
       setDataVer(v => v + 1); setIsDirty(false); setSel(null); setStatus('')
       loadTexAndRebuild(b.body_data)
     })
@@ -234,7 +234,7 @@ const ModelerBase = forwardRef(function Modeler({
       const jem = partToJem(p)
       dataRef.current = jem; origRef.current = jem
       undoStackRef.current = []; redoStackRef.current = []
-      if (ctxRef.current && !embedded) ctxRef.current.firstLoad = true
+      if (ctxRef.current && !embedded) { ctxRef.current.firstLoad = true; ctxRef.current.sceneOffset = null }
       setDataVer(v => v + 1); setIsDirty(false); setSel(null); setStatus('')
       loadTexAndRebuild(jem)
     })
@@ -258,7 +258,7 @@ const ModelerBase = forwardRef(function Modeler({
 
     const tc = new TransformControls(extCtx.camera, extCtx.renderer.domElement)
     tc.setMode('translate')
-    tc.setTranslationSnap(1)
+    tc.setTranslationSnap(0.5)
     tc.setRotationSnap(Math.PI / 12)  // 15°
     tc.setScaleSnap(0.5)
     extCtx.scene.add(tc)
@@ -266,6 +266,11 @@ const ModelerBase = forwardRef(function Modeler({
     tc.addEventListener('dragging-changed', e => { extCtx.controls.enabled = !e.value })
     tc.addEventListener('change', () => { if (helperRef.current) helperRef.current.update() })
     tc.addEventListener('mouseUp', () => { syncTCToData(tc) })
+
+    const onKeyDown = e => { if (e.key === 'Shift') { tc.setTranslationSnap(0.1); tc.setScaleSnap(0.1); tc.setRotationSnap(Math.PI / 60) } }
+    const onKeyUp   = e => { if (e.key === 'Shift') { tc.setTranslationSnap(0.5); tc.setScaleSnap(0.5); tc.setRotationSnap(Math.PI / 12) } }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup',   onKeyUp)
 
     ctxRef.current = {
       scene: extCtx.scene,
@@ -289,6 +294,8 @@ const ModelerBase = forwardRef(function Modeler({
     })
 
     return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup',   onKeyUp)
       tc.detach()
       if (helperRef.current) {
         extCtx.scene.remove(helperRef.current)
@@ -339,7 +346,7 @@ const ModelerBase = forwardRef(function Modeler({
 
     const tc = new TransformControls(camera, renderer.domElement)
     tc.setMode('translate')
-    tc.setTranslationSnap(1)
+    tc.setTranslationSnap(0.5)
     tc.setRotationSnap(Math.PI / 12)  // 15°
     tc.setScaleSnap(0.5)
     scene.add(tc)
@@ -352,6 +359,11 @@ const ModelerBase = forwardRef(function Modeler({
 
     // Sync gizmo result → data on release
     tc.addEventListener('mouseUp', () => { syncTCToData(tc) })
+
+    const onKeyDown = e => { if (e.key === 'Shift') { tc.setTranslationSnap(0.1); tc.setScaleSnap(0.1); tc.setRotationSnap(Math.PI / 60) } }
+    const onKeyUp   = e => { if (e.key === 'Shift') { tc.setTranslationSnap(0.5); tc.setScaleSnap(0.5); tc.setRotationSnap(Math.PI / 12) } }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup',   onKeyUp)
 
     let animId
     function animate() { animId = requestAnimationFrame(animate); orbit.update(); renderer.render(scene, camera) }
@@ -366,6 +378,8 @@ const ModelerBase = forwardRef(function Modeler({
     ctxRef.current = { scene, camera, renderer, orbit, tc, grid, modelGroup: null, firstLoad: true }
 
     return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup',   onKeyUp)
       cancelAnimationFrame(animId); ro.disconnect()
       orbit.dispose(); tc.dispose(); renderer.dispose()
       if (bodyGroupRef.current) { disposeGroup(bodyGroupRef.current); bodyGroupRef.current = null }
@@ -374,9 +388,8 @@ const ModelerBase = forwardRef(function Modeler({
     }
   }, [])
 
-  // ── Rebuild on data change (not from TC sync) ──────────────────────────────
+  // ── Rebuild on data change ──────────────────────────────────────────────────
   useEffect(() => {
-    if (tcSyncRef.current) return
     rebuildScene()
   }, [dataVer])  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -459,16 +472,18 @@ const ModelerBase = forwardRef(function Modeler({
     const group = buildSceneRoot(data, texMapRef.current)
     const box = new THREE.Box3().setFromObject(group)
     if (!box.isEmpty()) {
-      const center = box.getCenter(new THREE.Vector3())
-      group.position.x -= center.x
-      group.position.z -= center.z
-      group.position.y -= box.min.y
-      const modelHeight = box.max.y - box.min.y
-      ctx.orbit.target.set(0, modelHeight / 2, 0)
       if (ctx.firstLoad) {
+        // Compute centering offset once per model load and lock it in
+        const center = box.getCenter(new THREE.Vector3())
+        ctx.sceneOffset = { x: -center.x, y: -box.min.y, z: -center.z }
+        const modelHeight = box.max.y - box.min.y
+        ctx.orbit.target.set(0, modelHeight / 2, 0)
         const size = box.getSize(new THREE.Vector3()).length()
         ctx.camera.position.set(size * .8, size * .6, size * 1.2); ctx.orbit.update(); ctx.firstLoad = false
       }
+      // Always apply the locked offset so rebuilds don't shift the scene
+      const off = ctx.sceneOffset || { x: 0, y: 0, z: 0 }
+      group.position.set(off.x, off.y, off.z)
     } else if (ctx.firstLoad) {
       ctx.orbit.target.set(0, 8, 0)
       ctx.camera.position.set(20, 15, 25); ctx.orbit.update(); ctx.firstLoad = false
@@ -558,19 +573,25 @@ const ModelerBase = forwardRef(function Modeler({
       const newW = Math.max(1, Math.round(bw * Math.abs(obj.scale.x)))
       const newH = Math.max(1, Math.round(bh * Math.abs(obj.scale.y)))
       const newD = Math.max(1, Math.round(bd * Math.abs(obj.scale.z)))
+      // TC scales from the mesh center, so the corner shifts when size changes
+      const newBx = Math.round(bx + bw / 2 - newW / 2)
+      const newBy = Math.round(by + bh / 2 - newH / 2)
+      const newBz = Math.round(bz + bd / 2 - newD / 2)
       newModels = updateNode(data.models, sel.modelPath, n => {
         const boxes = [...n.boxes]
-        boxes[sel.boxIdx] = { ...box, coordinates: [bx, by, bz, newW, newH, newD] }
+        boxes[sel.boxIdx] = { ...box, coordinates: [newBx, newBy, newBz, newW, newH, newD] }
         return { ...n, boxes }
       })
     } else if (sel.kind === 'box') {
       const box = model.boxes[sel.boxIdx]
       const [, , , bw = 1, bh = 1, bd = 1] = box.coordinates || []
+      // Round to nearest 0.5 so odd-width boxes can be centered exactly (center at 0 → corner at -w/2)
+      const h = v => Math.round(v * 2) / 2
       newModels = updateNode(data.models, sel.modelPath, n => {
         const boxes = [...n.boxes]
         boxes[sel.boxIdx] = {
           ...box, coordinates: [
-            Math.round(obj.position.x / sx - bw / 2), Math.round(obj.position.y / sy - bh / 2), Math.round(obj.position.z / sz - bd / 2),
+            h(obj.position.x / sx - bw / 2), h(obj.position.y / sy - bh / 2), h(obj.position.z / sz - bd / 2),
             bw, bh, bd,
           ]
         }
@@ -579,10 +600,8 @@ const ModelerBase = forwardRef(function Modeler({
     } else return
 
     pushUndo()
-    tcSyncRef.current = true
     dataRef.current = { ...data, models: newModels }
     setDataVer(v => v + 1); setIsDirty(true)
-    setTimeout(() => { tcSyncRef.current = false }, 0)
   }
 
   // ── Raycasting click-to-select ──────────────────────────────────────────────
@@ -724,8 +743,11 @@ const ModelerBase = forwardRef(function Modeler({
       }
     }
 
+    const paths = dataRef.current ? collectTexturePaths(dataRef.current) : []
+    const curTexPath = paths.length ? normTexPath(paths[0]) : null
+
     if (rectSets.length) {
-      onUvChange?.({ rectSets, selFace: singleBox ? selFaceRef.current : null })
+      onUvChange?.({ rectSets, selFace: singleBox ? selFaceRef.current : null, texPath: curTexPath })
     } else {
       onUvChange?.(null)
     }

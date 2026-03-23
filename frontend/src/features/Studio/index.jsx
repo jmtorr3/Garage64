@@ -483,9 +483,9 @@ export default function Studio() {
       for (let x = 0; x <= tw; x++) { ctx.beginPath(); ctx.moveTo(x * zoom, 0); ctx.lineTo(x * zoom, th * zoom); ctx.stroke() }
       for (let y = 0; y <= th; y++) { ctx.beginPath(); ctx.moveTo(0, y * zoom); ctx.lineTo(tw * zoom, y * zoom); ctx.stroke() }
     }
-    // UV overlay from block editor selection
+    // UV overlay from block editor selection (only when editing same texture)
     const uvo = uvOverlayRef.current
-    if (uvo) {
+    if (uvo && uvo.texPath === texPath) {
       const FACE_COLORS = { north: '#ff4455', south: '#44dd66', east: '#4499ff', west: '#ffcc00', up: '#44ffdd', down: '#ff44cc' }
       for (const rects of uvo.rectSets) {
         for (const [face, r] of Object.entries(rects)) {
@@ -617,7 +617,7 @@ export default function Studio() {
   // Returns { face, isMulti } if px,py hits any visible UV rect, null otherwise
   function hitTestUV(px, py) {
     const uvo = uvOverlayRef.current
-    if (!uvo || !uvo.rectSets.length) return null
+    if (!uvo || !uvo.rectSets.length || uvo.texPath !== texPath) return null
     for (const rects of uvo.rectSets) {
       for (const [face, r] of Object.entries(rects)) {
         if (!r) continue
