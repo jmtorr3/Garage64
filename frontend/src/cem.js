@@ -148,10 +148,10 @@ function parseBox(box, mat, tw, th, inv, mirrorU) {
     uvFaces = {
       north: normUV(box.uvNorth, tw, th),
       south: normUV(box.uvSouth, tw, th),
-      east:  normUV(box.uvEast,  tw, th),
-      west:  normUV(box.uvWest,  tw, th),
-      up:    normUV(box.uvUp,    tw, th),
-      down:  normUV(box.uvDown,  tw, th),
+      east: normUV(box.uvEast, tw, th),
+      west: normUV(box.uvWest, tw, th),
+      up: normUV(box.uvUp, tw, th),
+      down: normUV(box.uvDown, tw, th),
     }
   } else {
     const geo = new THREE.BoxGeometry(w, h, d)
@@ -210,12 +210,12 @@ function normUV([x1, y1, x2, y2], tw, th) {
 function mcCubeUVs(u, v, w, h, d, tw, th) {
   const f = (x1, y1, x2, y2) => normUV([x1, y1, x2, y2], tw, th)
   return {
-    up:    f(u + d,           v,       u + d + w,           v + d    ),
-    down:  f(u + d + w,       v,       u + 2 * d + w,       v + d    ),
-    west:  f(u,               v + d,   u + d,               v + d + h),
-    south: f(u + d,           v + d,   u + d + w,           v + d + h),
-    east:  f(u + d + w,       v + d,   u + 2 * d + w,       v + d + h),
-    north: f(u + 2 * d + w,   v + d,   u + 2 * d + 2 * w,  v + d + h),
+    up: f(u + d, v, u + d + w, v + d),
+    down: f(u + d + w, v, u + 2 * d + w, v + d),
+    west: f(u, v + d, u + d, v + d + h),
+    south: f(u + d, v + d, u + d + w, v + d + h),
+    east: f(u + d + w, v + d, u + 2 * d + w, v + d + h),
+    north: f(u + 2 * d + w, v + d, u + 2 * d + 2 * w, v + d + h),
   }
 }
 
@@ -236,12 +236,12 @@ function buildBoxGeo(w, h, d, uvFaces) {
   //     The -hh geometry also has its Z vertex order reversed relative to the
   //     expected north=v1/south=v0 convention, so it needs flipV: true as well.
   const FACES = [
-    { name: 'south', flipV: true,  verts: [[-hw,-hh, hd],[ hw,-hh, hd],[ hw, hh, hd],[-hw, hh, hd]] },
-    { name: 'north', flipV: true,  verts: [[ hw,-hh,-hd],[-hw,-hh,-hd],[-hw, hh,-hd],[ hw, hh,-hd]] },
-    { name: 'east',  flipV: true,  verts: [[ hw,-hh, hd],[ hw,-hh,-hd],[ hw, hh,-hd],[ hw, hh, hd]] },
-    { name: 'west',  flipV: true,  verts: [[-hw,-hh,-hd],[-hw,-hh, hd],[-hw, hh, hd],[-hw, hh,-hd]] },
-    { name: 'down',  flipV: false, verts: [[-hw, hh, hd],[ hw, hh, hd],[ hw, hh,-hd],[-hw, hh,-hd]] },
-    { name: 'up',    flipV: true,  verts: [[-hw,-hh,-hd],[ hw,-hh,-hd],[ hw,-hh, hd],[-hw,-hh, hd]] },
+    { name: 'south', flipV: true, verts: [[-hw, -hh, hd], [hw, -hh, hd], [hw, hh, hd], [-hw, hh, hd]] },
+    { name: 'north', flipV: true, verts: [[hw, -hh, -hd], [-hw, -hh, -hd], [-hw, hh, -hd], [hw, hh, -hd]] },
+    { name: 'east', flipV: true, verts: [[hw, -hh, hd], [hw, -hh, -hd], [hw, hh, -hd], [hw, hh, hd]] },
+    { name: 'west', flipV: true, verts: [[-hw, -hh, -hd], [-hw, -hh, hd], [-hw, hh, hd], [-hw, hh, -hd]] },
+    { name: 'down', flipV: false, verts: [[-hw, hh, hd], [hw, hh, hd], [hw, hh, -hd], [-hw, hh, -hd]] },
+    { name: 'up', flipV: true, verts: [[-hw, -hh, -hd], [hw, -hh, -hd], [hw, -hh, hd], [-hw, -hh, hd]] },
   ]
 
   const positions = [], uvs = [], indices = []
@@ -260,7 +260,7 @@ function buildBoxGeo(w, h, d, uvFaces) {
 
   const geo = new THREE.BufferGeometry()
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-  geo.setAttribute('uv',       new THREE.Float32BufferAttribute(uvs, 2))
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
   geo.setIndex(indices)
   geo.computeVertexNormals()
   return geo
